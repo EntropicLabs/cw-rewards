@@ -2,8 +2,9 @@ use cosmwasm_std::{Addr, Deps, Order, StdResult, Uint128};
 use cw_storage_plus::Bound;
 use kujira::{bow::staking::IncentivesResponse, KujiraQuery};
 use rewards_interfaces::{PendingRewardsResponse, StakeInfoResponse};
+use rewards_logic::incentive;
 
-use crate::{contract::STATE_MACHINE, incentive, ContractError};
+use crate::{contract::STATE_MACHINE, ContractError};
 
 pub fn pending_rewards(
     deps: Deps<KujiraQuery>,

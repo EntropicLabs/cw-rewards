@@ -1,3 +1,4 @@
+use crate::RewardsSM;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
@@ -5,9 +6,6 @@ use kujira::{
     bow::staking::{IncentiveResponse, ScheduleResponse},
     Denom, Schedule,
 };
-use rewards_logic::RewardsSM;
-
-use crate::ContractError;
 
 pub fn incentives<'a>() -> IndexedMap<'a, u128, Incentive, IncentiveIndexes<'a>> {
     IndexedMap::new(
@@ -49,7 +47,7 @@ impl Incentive {
         denom: Denom,
         schedule: Schedule,
         now: &Timestamp,
-    ) -> Result<Self, ContractError> {
+    ) -> StdResult<Self> {
         let incentive_id = INCENTIVE_ID
             .may_load(storage)?
             .unwrap_or_default()

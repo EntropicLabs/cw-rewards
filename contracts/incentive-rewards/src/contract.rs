@@ -11,13 +11,12 @@ use rewards_interfaces::{
     incentive::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg},
     RewardsMsg,
 };
-use rewards_logic::RewardsSM;
-
-use crate::{
-    execute,
+use rewards_logic::{
     incentive::{self, Incentive},
-    query, Config, ContractError,
+    RewardsSM,
 };
+
+use crate::{execute, query, Config, ContractError};
 
 const CONTRACT_NAME: &str = "entropic/incentivized-rewards";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
