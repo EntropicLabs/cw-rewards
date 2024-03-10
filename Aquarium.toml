@@ -1,0 +1,34 @@
+project = "cw-rewards"
+scripts_path = "scripts"
+hd_path = "m/44'/118'/0'/0/0"
+default_network = "devnet"
+
+[networks.devnet]
+chain_id = "localkujira"
+lcd_addr = "http://localhost:1319"
+gas_price = 0
+gas_adjustment = 1.25
+gas_denom = "ukuji"
+account_prefix = "kujira"
+
+[networks.mainnet]
+chain_id = "kaiyo-1"
+lcd_addr = "https://lcd-kujira.mintthemoon.xyz"
+gas_price = 0.00125
+gas_adjustment = 1.25
+gas_denom = "ukuji"
+account_prefix = "kujira"
+
+[networks.testnet]
+chain_id = "harpoon-4"
+lcd_addr = "https://kujira-testnet-api.polkachu.com"
+gas_price = 0.00125
+gas_adjustment = 1.25
+gas_denom = "ukuji"
+account_prefix = "kujira"
+
+[accounts.testnet]
+env = "TESTNET_MNEMONIC"
+
+[accounts.testnet2]
+env = "TESTNET_2_MNEMONIC"

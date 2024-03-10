@@ -1,0 +1,30 @@
+[package]
+name = "incentive-rewards"
+version = "1.0.0"
+authors = ["Amit Prasad <amit@entropiclabs.io>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+library = []
+
+
+[dependencies]
+kujira = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, default-features = false, features = ["derive"] }
+rewards-logic.workspace = true
+rewards-interfaces.workspace = true
+thiserror = "1"
+
+[dev-dependencies]
+cw-multi-test = { workspace = true }
+kujira-rs-testing = { workspace = true }

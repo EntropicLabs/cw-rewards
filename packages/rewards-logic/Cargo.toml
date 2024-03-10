@@ -1,0 +1,15 @@
+[package]
+name = "rewards-logic"
+version = "1.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cosmwasm-std.workspace = true
+cosmwasm-schema.workspace = true
+cw-storage-plus.workspace = true
+thiserror.workspace = true
+cw-utils.workspace = true
+kujira.workspace = true
+rewards-interfaces.workspace = true
