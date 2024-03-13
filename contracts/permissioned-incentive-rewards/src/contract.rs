@@ -18,7 +18,7 @@ use rewards_logic::{
 
 use crate::{execute, query, Config, ContractError};
 
-const CONTRACT_NAME: &str = "entropic/incentivized-rewards";
+const CONTRACT_NAME: &str = "entropic/permissioned-incentivized-rewards";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const STATE_MACHINE: RewardsSM = RewardsSM::new();

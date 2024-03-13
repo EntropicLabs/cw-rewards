@@ -60,7 +60,13 @@ pub fn execute(
                     staker: env.contract.address.clone(),
                 },
             )?;
-            let msgs = if !pending.rewards.is_empty() {
+            let msgs = if !pending.rewards.is_empty()
+                && !STATE_MACHINE
+                    .total_staked
+                    .may_load(deps.storage)?
+                    .unwrap_or_default()
+                    .is_zero()
+            {
                 STATE_MACHINE.distribute_rewards(deps.storage, &pending.rewards)?;
                 vec![SubMsg::new(wasm_execute(
                     &config.underlying_rewards,
@@ -91,12 +97,12 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps<KujiraQuery>, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+pub fn query(deps: Deps<KujiraQuery>, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     let config = Config::load(deps.storage)?;
     Ok(match msg {
         QueryMsg::Config {} => to_json_binary(&ConfigResponse::from(config)),
         QueryMsg::PendingRewards { staker } => {
-            to_json_binary(&query::pending_rewards(deps, staker)?)
+            to_json_binary(&query::pending_rewards(deps, env, &config, staker)?)
         }
         QueryMsg::StakeInfo { staker } => to_json_binary(&query::stake_info(deps, staker)?),
     }?)

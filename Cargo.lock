@@ -290,6 +290,7 @@ dependencies = [
  "cw2",
  "kujira",
  "kujira-rs-testing",
+ "permissioned-incentive-rewards",
  "rewards-interfaces",
  "rewards-logic",
  "schemars",

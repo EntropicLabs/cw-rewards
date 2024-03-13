@@ -28,3 +28,4 @@ thiserror = "1"
 [dev-dependencies]
 cw-multi-test = { workspace = true }
 kujira-rs-testing = { workspace = true }
+permissioned-incentive-rewards = { path = "../permissioned-incentive-rewards" }
