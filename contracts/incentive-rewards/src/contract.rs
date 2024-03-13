@@ -57,12 +57,19 @@ pub fn execute(
     let mut config = Config::load(deps.storage)?;
     match msg {
         ExecuteMsg::Rewards(msg) => {
-            incentive::distribute_lri(
-                deps.storage,
-                config.incentive_crank_limit,
-                STATE_MACHINE,
-                &env.block.time,
-            )?;
+            if !STATE_MACHINE
+                .total_staked
+                .may_load(deps.storage)?
+                .unwrap_or_default()
+                .is_zero()
+            {
+                incentive::distribute_lri(
+                    deps.storage,
+                    config.incentive_crank_limit,
+                    STATE_MACHINE,
+                    &env.block.time,
+                )?;
+            }
             match msg {
                 RewardsMsg::Stake(msg) => execute::stake(deps, info, config, msg),
                 RewardsMsg::Unstake(msg) => execute::unstake(deps, info, config, msg),
@@ -100,12 +107,12 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps<KujiraQuery>, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+pub fn query(deps: Deps<KujiraQuery>, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     let config = Config::load(deps.storage)?;
     Ok(match msg {
         QueryMsg::Config {} => to_json_binary(&ConfigResponse::from(config)),
         QueryMsg::PendingRewards { staker } => {
-            to_json_binary(&query::pending_rewards(deps, staker)?)
+            to_json_binary(&query::pending_rewards(deps, env, &config, staker)?)
         }
         QueryMsg::StakeInfo { staker } => to_json_binary(&query::stake_info(deps, staker)?),
         QueryMsg::Incentives { start_after, limit } => {

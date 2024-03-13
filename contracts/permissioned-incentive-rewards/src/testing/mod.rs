@@ -3,7 +3,7 @@ mod multi;
 
 use cosmwasm_std::{coin, coins, Decimal, StdResult, Uint128};
 use cw_multi_test::Executor;
-use kujira::fee_address;
+use kujira::{bow::staking::IncentivesResponse, fee_address, Schedule};
 use kujira_rs_testing::mock::CustomApp;
 use rewards_interfaces::{permissioned_incentive::*, *};
 
@@ -262,4 +262,334 @@ fn test_fees() {
     assert!(pending.is_ok());
     let pending = pending.unwrap();
     assert_eq!(pending.rewards, vec![coin(600, "TOKEN")]); // 800 * 0.75 = 600
+}
+
+#[test]
+fn test_incentives() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    // add incentive
+    let now = app.block_info().time;
+    let end = now.plus_seconds(60);
+    let res = app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::AddIncentive {
+            denom: "OTHER_TOKEN".into(),
+            schedule: Schedule {
+                start: now,
+                end,
+                amount: 1_000u128.into(),
+                release: kujira::Release::Fixed,
+            },
+        },
+        &[coin(1_000, "OTHER_TOKEN"), coin(100, "TOKEN")],
+    );
+
+    assert!(res.is_ok(), "{res:?}");
+
+    // Check incentive query
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 1);
+
+    // Check pending right now
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert!(pending.rewards.is_empty());
+
+    // Advance time by 30 seconds
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pending after 30 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(pending.rewards, vec![coin(375, "OTHER_TOKEN")]);
+
+    // Do some bogus action to crank the contract
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pending again, should be same, but with bogus action rewards
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(375, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Check incentive query
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 1);
+
+    // Advance time by 30 seconds
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pending after 60 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(750, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Advance time past incentive end
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pending after 90 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(750, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Crank contract again
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pending after 90 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(750, "OTHER_TOKEN"), coin(1500, "TOKEN")]
+    );
+
+    // Check incentive query
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert!(incentives.incentives.is_empty());
+}
+
+#[test]
+fn test_many_many_incentives() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    // add incentive
+    let now = app.block_info().time;
+    let end = now.plus_seconds(60);
+    for _ in 0..100 {
+        let res = app.execute_contract(
+            a.admin.clone(),
+            a.rewards.clone(),
+            &ExecuteMsg::AddIncentive {
+                denom: "OTHER_TOKEN".into(),
+                schedule: Schedule {
+                    start: now,
+                    end,
+                    amount: 1_000u128.into(),
+                    release: kujira::Release::Fixed,
+                },
+            },
+            &[coin(1_000, "OTHER_TOKEN"), coin(100, "TOKEN")],
+        );
+
+        assert!(res.is_ok(), "{res:?}");
+    }
+
+    // Check incentive query, should be capped to 30
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 30);
+
+    // Check incentive query with limit set
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: Some(1000),
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 100);
+
+    // Advance time by 30 seconds
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pendings, should be using the config.incentive_crank_limit
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(pending.rewards, vec![coin(375 * 10, "OTHER_TOKEN")]);
+
+    // Crank
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pendings, should be using the config.incentive_crank_limit
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(375 * 20, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Crank
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pendings, should be using the config.incentive_crank_limit
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(375 * 30, "OTHER_TOKEN"), coin(1500, "TOKEN")]
+    );
+
+    // Check incentive query with limit set
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: Some(1000),
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 100);
+
+    // Advance time past incentive end
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(31);
+    });
+
+    // Crank
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check incentive query with limit set
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: Some(1000),
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 90);
 }

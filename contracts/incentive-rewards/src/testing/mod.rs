@@ -1,430 +1,310 @@
 #![cfg(test)]
-use std::marker::PhantomData;
+mod multi;
 
-use cosmwasm_std::{
-    testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage},
-    BankMsg, Coin, CosmosMsg, Decimal, Decimal256, Env, MessageInfo, OwnedDeps, Uint128, Uint256,
-};
-use kujira::{fee_address, KujiraQuery};
+use cosmwasm_std::{coin, coins, Decimal, StdResult, Uint128};
+use cw_multi_test::Executor;
+use kujira::{bow::staking::IncentivesResponse, fee_address, Schedule};
+use kujira_rs_testing::mock::CustomApp;
 use rewards_interfaces::{incentive::*, *};
-use rewards_logic::state_machine::RewardInfo;
 
-use crate::{
-    contract::instantiate,
-    contract::STATE_MACHINE,
-    execute::{claim, distribute, stake, unstake},
-    Config,
-};
+use crate::testing::multi::setup_env;
 
-type OwnedDepsType = OwnedDeps<MockStorage, MockApi, MockQuerier, KujiraQuery>;
+use self::multi::Addrs;
 
-pub fn mock_dependencies() -> OwnedDepsType {
-    OwnedDeps {
-        storage: MockStorage::default(),
-        api: MockApi::default(),
-        querier: MockQuerier::default(),
-        custom_query_type: PhantomData,
-    }
-}
-
-fn setup_contract() -> (OwnedDepsType, Env, MessageInfo) {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-    let info = mock_info("sender", &[Coin::new(100, "tokens")]);
-
-    let instantiate_msg = InstantiateMsg {
-        owner: info.sender.clone(),
-        stake_denom: "tokens".into(),
-        whitelisted_rewards: WhitelistedRewards::All,
-        fees: vec![],
-        incentive_crank_limit: 10,
-        incentive_min: Uint128::from(100u128),
-        incentive_fee: Coin::new(10, "ucoin"),
-    };
-
-    instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
-
-    (deps, env, info)
+fn set_default_weights(app: &mut CustomApp, a: &Addrs) {
+    app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[coin(150, "TOKEN")],
+    )
+    .unwrap();
+    app.execute_contract(
+        a.user2.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[coin(50, "TOKEN")],
+    )
+    .unwrap();
 }
 
 #[test]
 fn test_stake() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
+    let (mut app, a) = setup_env();
 
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[coin(100, "TOKEN")],
+    );
+    assert!(res.is_ok(), "{res:?}");
 
-    stake(deps.as_mut(), info.clone(), config, stake_msg).unwrap();
+    // Check the staked amount
+    let stake_info: StdResult<StakeInfoResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::StakeInfo {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(stake_info.is_ok());
+    let stake_info = stake_info.unwrap();
+    assert_eq!(stake_info.amount, Uint128::from(100u128));
 
-    let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
-    assert_eq!(total_staked, Uint128::from(100u128));
+    // Stake other user
+    let res = app.execute_contract(
+        a.user2.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[coin(50, "TOKEN")],
+    );
+    assert!(res.is_ok(), "{res:?}");
 
-    let user_stakes = STATE_MACHINE
-        .user_weights
-        .load(&deps.storage, &info.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes, Uint128::from(100u128));
+    // Check the staked amount
+    let stake_info: StdResult<StakeInfoResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::StakeInfo {
+            staker: a.user2.clone(),
+        },
+    );
+    assert!(stake_info.is_ok());
+    let stake_info = stake_info.unwrap();
+    assert_eq!(stake_info.amount, Uint128::from(50u128));
+
+    // Stake again with the same user
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[coin(100, "TOKEN")],
+    );
+    assert!(res.is_ok());
+
+    // Check the staked amount
+    let stake_info: StdResult<StakeInfoResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::StakeInfo {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(stake_info.is_ok());
+    let stake_info = stake_info.unwrap();
+    assert_eq!(stake_info.amount, Uint128::from(200u128));
+
+    // Stake w/ 0
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[],
+    );
+    assert!(res.is_err());
 }
 
 #[test]
 fn test_unstake() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
 
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            UnstakeMsg {
+                amount: Uint128::from(100u128),
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[],
+    );
+    assert!(res.is_ok());
 
-    // Now unstake
-    let unstake_msg = UnstakeMsg {
-        amount: Uint128::from(50u128),
-        withdraw_rewards: false,
-        callback: None,
-    };
-    unstake(deps.as_mut(), info.clone(), config, unstake_msg).unwrap();
+    // Check the staked amount
+    let stake_info: StdResult<StakeInfoResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::StakeInfo {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(stake_info.is_ok());
+    let stake_info = stake_info.unwrap();
+    assert_eq!(stake_info.amount, Uint128::from(50u128));
 
-    let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
-    assert_eq!(total_staked, Uint128::from(50u128));
+    // Unstake all
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            UnstakeMsg {
+                amount: Uint128::from(50u128),
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[],
+    );
+    assert!(res.is_ok());
 
-    let user_stakes = STATE_MACHINE
-        .user_weights
-        .load(&deps.storage, &info.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes, Uint128::from(50u128));
-}
+    // Check the staked amount
+    let stake_info: StdResult<StakeInfoResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::StakeInfo {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(stake_info.is_ok());
+    let stake_info = stake_info.unwrap();
+    assert_eq!(stake_info.amount, Uint128::zero());
 
-#[test]
-fn test_claim_rewards() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
-
-    // Simulating reward distribution
-    let distribute_msg = DistributeRewardsMsg { callback: None };
-    distribute(deps.as_mut(), info.clone(), config, distribute_msg).unwrap();
-
-    let claim_msg = ClaimRewardsMsg { callback: None };
-    claim(deps.as_mut(), info.clone(), claim_msg).unwrap();
-
-    // Check rewards for the staker
-    let key = (&info.sender.to_string(), "tokens");
-    let reward_info: RewardInfo = STATE_MACHINE.user_rewards.load(&deps.storage, key).unwrap();
-    assert_eq!(reward_info.accrued, Uint128::zero());
+    // Try unstake more than staked
+    let res = app.execute_contract(
+        a.user2.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            UnstakeMsg {
+                amount: Uint128::from(100u128),
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[],
+    );
+    assert!(res.is_err());
 }
 
 #[test]
 fn test_distribute_rewards() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
 
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
+    let res = app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    );
+    assert!(res.is_ok());
 
-    let distribute_msg = DistributeRewardsMsg { callback: None };
-    distribute(deps.as_mut(), info, config, distribute_msg).unwrap();
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(pending.rewards, vec![coin(750, "TOKEN")]);
+}
 
-    // Check the global index
-    let global_index = STATE_MACHINE
-        .global_indices
-        .load(&deps.storage, "tokens")
-        .unwrap();
+#[test]
+fn test_claim_rewards() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(ClaimRewardsMsg { callback: None }.into()),
+        &[],
+    );
+    assert!(res.is_ok());
+
+    let user_balance = app.wrap().query_balance(&a.user, "TOKEN").unwrap();
     assert_eq!(
-        global_index,
-        Decimal256::from_ratio(Uint256::from(100u128), Uint256::from(100u128))
+        user_balance.amount,
+        Uint128::from(750u128 + 1_000_000_000_000u128 - 150u128)
     );
 }
 
 #[test]
-fn test_stake_zero() {
-    let (mut deps, _env, _info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // Stake with zero amount
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-
-    let info_zero = mock_info("sender", &[]);
-    let res = stake(deps.as_mut(), info_zero.clone(), config, stake_msg);
-    assert!(res.is_err()); // Expect an error
-
-    let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
-    assert_eq!(total_staked, Uint128::zero());
-
-    let user_stakes = STATE_MACHINE
-        .user_weights
-        .may_load(&deps.storage, &info_zero.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes, None);
-}
-
-#[test]
-fn test_unstake_more_than_staked() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
-
-    // Now try to unstake more than the staked amount
-    let unstake_msg = UnstakeMsg {
-        amount: Uint128::from(150u128), // More than staked
-        withdraw_rewards: false,
-        callback: None,
-    };
-    let result = unstake(deps.as_mut(), info, config, unstake_msg);
-    assert!(result.is_err()); // Expect an error
-}
-
-#[test]
 fn test_claim_without_staking() {
-    let (mut deps, _env, info) = setup_contract();
-
-    // Claim without staking
-    let claim_msg = ClaimRewardsMsg { callback: None };
-    let result = claim(deps.as_mut(), info, claim_msg);
-    assert!(result.is_err()); // Expect an error
+    let (mut app, a) = setup_env();
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(ClaimRewardsMsg { callback: None }.into()),
+        &[],
+    );
+    assert!(res.is_err());
 }
 
 #[test]
 fn test_distribute_without_staking() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    let distribute_msg = DistributeRewardsMsg { callback: None };
-    let res = distribute(deps.as_mut(), info, config, distribute_msg);
-    assert!(res.is_err()); // Expect an error
-}
-
-#[test]
-fn test_unstake_zero() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
-
-    // Now unstake zero amount
-    let unstake_msg = UnstakeMsg {
-        amount: Uint128::zero(),
-        withdraw_rewards: false,
-        callback: None,
-    };
-    let result = unstake(deps.as_mut(), info, config, unstake_msg);
-    assert!(result.is_err()); // Expect an error
-}
-
-#[test]
-fn test_multiple_stakes_same_user() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // Stake multiple times by the same user
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-
-    stake(
-        deps.as_mut(),
-        info.clone(),
-        config.clone(),
-        stake_msg.clone(),
-    )
-    .unwrap();
-    stake(deps.as_mut(), info.clone(), config, stake_msg).unwrap();
-
-    let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
-    assert_eq!(total_staked, Uint128::from(200u128)); // 100 + 100
-
-    let user_stakes = STATE_MACHINE
-        .user_weights
-        .load(&deps.storage, &info.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes, Uint128::from(200u128)); // 100 + 100
-}
-
-#[test]
-fn test_multiple_stakes_multiple_users() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-
-    // Stake by first user
-    stake(
-        deps.as_mut(),
-        info.clone(),
-        config.clone(),
-        stake_msg.clone(),
-    )
-    .unwrap();
-
-    // Stake by second user
-    let info2 = mock_info("another_sender", &[Coin::new(200, "tokens")]);
-    stake(deps.as_mut(), info2.clone(), config, stake_msg).unwrap();
-
-    let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
-    assert_eq!(total_staked, Uint128::from(300u128)); // 100 + 200
-
-    let user_stakes1 = STATE_MACHINE
-        .user_weights
-        .load(&deps.storage, &info.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes1, Uint128::from(100u128));
-
-    let user_stakes2 = STATE_MACHINE
-        .user_weights
-        .load(&deps.storage, &info2.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes2, Uint128::from(200u128));
-}
-
-#[test]
-fn test_unstake_all() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
-
-    // Unstake all
-    let unstake_msg = UnstakeMsg {
-        amount: Uint128::from(100u128),
-        withdraw_rewards: false,
-        callback: None,
-    };
-    unstake(deps.as_mut(), info.clone(), config, unstake_msg).unwrap();
-
-    let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
-    assert_eq!(total_staked, Uint128::zero());
-
-    let user_stakes = STATE_MACHINE
-        .user_weights
-        .may_load(&deps.storage, &info.sender.to_string())
-        .unwrap();
-    assert_eq!(user_stakes, None);
+    let (mut app, a) = setup_env();
+    let res = app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    );
+    assert!(res.is_err());
 }
 
 #[test]
 fn test_distribute_no_rewards() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
 
-    //First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info, config.clone(), stake_msg).unwrap();
-
-    let distribute_msg = DistributeRewardsMsg { callback: None };
-    let info_zero = mock_info("sender", &[]);
-    let res = distribute(deps.as_mut(), info_zero, config, distribute_msg);
-    assert!(res.is_err()); // Expect an error
-}
-
-#[test]
-fn test_claim_after_unstake_all() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // First stake and then unstake all
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
-
-    let unstake_msg = UnstakeMsg {
-        amount: Uint128::from(100u128),
-        withdraw_rewards: false,
-        callback: None,
-    };
-    unstake(deps.as_mut(), info.clone(), config, unstake_msg).unwrap();
-
-    // Claim after unstaking all
-    let claim_msg = ClaimRewardsMsg { callback: None };
-    let result = claim(deps.as_mut(), info, claim_msg);
-    assert!(result.is_err()); // Expect an error
-}
-
-#[test]
-fn test_claim_after_stake_distribute_unstake() {
-    let (mut deps, _env, info) = setup_contract();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-    let stake_denom = config.stake_denom.clone();
-
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
-
-    // Simulating reward distribution
-    let distribute_msg = DistributeRewardsMsg { callback: None };
-    distribute(deps.as_mut(), info.clone(), config.clone(), distribute_msg).unwrap();
-
-    // Unstake all
-    let unstake_msg = UnstakeMsg {
-        amount: Uint128::from(100u128),
-        withdraw_rewards: false,
-        callback: None,
-    };
-    unstake(deps.as_mut(), info.clone(), config, unstake_msg).unwrap();
-
-    // Check rewards for the staker
-    let key = (&info.sender.to_string(), stake_denom.as_ref());
-    let reward_info: RewardInfo = STATE_MACHINE.user_rewards.load(&deps.storage, key).unwrap();
-    assert_eq!(reward_info.accrued, Uint128::from(100u128));
-
-    // Claim after staking and distributing rewards
-    let claim_msg = ClaimRewardsMsg { callback: None };
-    claim(deps.as_mut(), info, claim_msg).unwrap();
-
-    // Check rewards for the staker
-    let reward_info: Option<RewardInfo> = STATE_MACHINE
-        .user_rewards
-        .may_load(&deps.storage, key)
-        .unwrap();
-    assert_eq!(reward_info, None);
+    let res = app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &[],
+    );
+    assert!(res.is_err());
 }
 
 #[test]
 fn test_fees() {
-    let (mut deps, _env, info) = setup_contract();
+    let (mut app, a) = setup_env();
     let config_update = ConfigUpdate {
         owner: None,
         stake_denom: None,
@@ -437,38 +317,489 @@ fn test_fees() {
         incentive_min: None,
         incentive_fee: None,
     };
-    crate::contract::execute(
-        deps.as_mut(),
-        mock_env(),
-        info.clone(),
-        ExecuteMsg::UpdateConfig(config_update),
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::UpdateConfig(config_update),
+        &[],
     )
     .unwrap();
-    let config = Config::load(deps.as_mut().storage).unwrap();
-
-    // First stake some tokens
-    let stake_msg = StakeMsg {
-        withdraw_rewards: false,
-        callback: None,
-    };
-    stake(deps.as_mut(), info.clone(), config.clone(), stake_msg).unwrap();
+    set_default_weights(&mut app, &a);
 
     // Simulating reward distribution
-    let distribute_msg = DistributeRewardsMsg { callback: None };
-    let res = distribute(deps.as_mut(), info.clone(), config.clone(), distribute_msg).unwrap();
-    assert_eq!(res.messages.len(), 2);
-    assert_eq!(
-        res.messages[0].msg,
-        CosmosMsg::Bank(BankMsg::Send {
-            to_address: fee_address().to_string(),
-            amount: vec![Coin::new(10, "tokens")]
-        })
+    let res = app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
     );
-    assert_eq!(
-        res.messages[1].msg,
-        CosmosMsg::Bank(BankMsg::Send {
-            to_address: fee_address().to_string(),
-            amount: vec![Coin::new(10, "tokens")]
-        })
+    assert!(res.is_ok());
+
+    // pending
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
     );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(pending.rewards, vec![coin(600, "TOKEN")]); // 800 * 0.75 = 600
+}
+
+#[test]
+fn test_claim_after_unstake_all() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            UnstakeMsg {
+                amount: Uint128::from(150u128),
+                callback: None,
+                withdraw_rewards: false,
+            }
+            .into(),
+        ),
+        &[],
+    )
+    .unwrap();
+
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(ClaimRewardsMsg { callback: None }.into()),
+        &[],
+    );
+    assert!(res.is_ok());
+
+    let user_balance = app.wrap().query_balance(&a.user, "TOKEN").unwrap();
+    assert_eq!(
+        user_balance.amount,
+        Uint128::from(750u128 + 1_000_000_000_000u128)
+    );
+
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert!(pending.rewards.is_empty());
+}
+
+#[test]
+fn test_inline_withdraw_rewards() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // first stake
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            StakeMsg {
+                callback: None,
+                withdraw_rewards: true,
+            }
+            .into(),
+        ),
+        &[coin(150, "TOKEN")],
+    );
+    assert!(res.is_ok());
+    //check balance
+    let user_balance = app.wrap().query_balance(&a.user, "TOKEN").unwrap();
+    assert_eq!(
+        user_balance.amount,
+        Uint128::from(750u128 + 1_000_000_000_000u128 - 300u128)
+    );
+
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    let res = app.execute_contract(
+        a.user.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(
+            UnstakeMsg {
+                amount: Uint128::from(300u128),
+                callback: None,
+                withdraw_rewards: true,
+            }
+            .into(),
+        ),
+        &[],
+    );
+    assert!(res.is_ok());
+
+    let user_balance = app.wrap().query_balance(&a.user, "TOKEN").unwrap();
+    assert_eq!(
+        user_balance.amount,
+        Uint128::from(750u128 + 1_000_000_000_000u128 + /* 300/350 * 1000 */ 857u128)
+    );
+
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert!(pending.rewards.is_empty());
+}
+
+#[test]
+fn test_incentives() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    // add incentive
+    let now = app.block_info().time;
+    let end = now.plus_seconds(60);
+    let res = app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::AddIncentive {
+            denom: "OTHER_TOKEN".into(),
+            schedule: Schedule {
+                start: now,
+                end,
+                amount: 1_000u128.into(),
+                release: kujira::Release::Fixed,
+            },
+        },
+        &[coin(1_000, "OTHER_TOKEN"), coin(100, "TOKEN")],
+    );
+
+    assert!(res.is_ok(), "{res:?}");
+
+    // Check incentive query
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 1);
+
+    // Check pending right now
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert!(pending.rewards.is_empty());
+
+    // Advance time by 30 seconds
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pending after 30 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(pending.rewards, vec![coin(375, "OTHER_TOKEN")]);
+
+    // Do some bogus action to crank the contract
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pending again, should be same, but with bogus action rewards
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(375, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Check incentive query
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 1);
+
+    // Advance time by 30 seconds
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pending after 60 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(750, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Advance time past incentive end
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pending after 90 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(750, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Crank contract again
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pending after 90 seconds
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(750, "OTHER_TOKEN"), coin(1500, "TOKEN")]
+    );
+
+    // Check incentive query
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert!(incentives.incentives.is_empty());
+}
+
+#[test]
+fn test_many_many_incentives() {
+    let (mut app, a) = setup_env();
+    set_default_weights(&mut app, &a);
+
+    // add incentive
+    let now = app.block_info().time;
+    let end = now.plus_seconds(60);
+    for _ in 0..100 {
+        let res = app.execute_contract(
+            a.admin.clone(),
+            a.rewards.clone(),
+            &ExecuteMsg::AddIncentive {
+                denom: "OTHER_TOKEN".into(),
+                schedule: Schedule {
+                    start: now,
+                    end,
+                    amount: 1_000u128.into(),
+                    release: kujira::Release::Fixed,
+                },
+            },
+            &[coin(1_000, "OTHER_TOKEN"), coin(100, "TOKEN")],
+        );
+
+        assert!(res.is_ok(), "{res:?}");
+    }
+
+    // Check incentive query, should be capped to 30
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 30);
+
+    // Check incentive query with limit set
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: Some(1000),
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 100);
+
+    // Advance time by 30 seconds
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(30);
+    });
+
+    // Check pendings, should be using the config.incentive_crank_limit
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(pending.rewards, vec![coin(375 * 10, "OTHER_TOKEN")]);
+
+    // Crank
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pendings, should be using the config.incentive_crank_limit
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(375 * 20, "OTHER_TOKEN"), coin(750, "TOKEN")]
+    );
+
+    // Crank
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check pendings, should be using the config.incentive_crank_limit
+    let pending: StdResult<PendingRewardsResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::PendingRewards {
+            staker: a.user.clone(),
+        },
+    );
+    assert!(pending.is_ok());
+    let pending = pending.unwrap();
+    assert_eq!(
+        pending.rewards,
+        vec![coin(375 * 30, "OTHER_TOKEN"), coin(1500, "TOKEN")]
+    );
+
+    // Check incentive query with limit set
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: Some(1000),
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 100);
+
+    // Advance time past incentive end
+    app.update_block(|b| {
+        b.height += 1;
+        b.time = b.time.plus_seconds(31);
+    });
+
+    // Crank
+    app.execute_contract(
+        a.admin.clone(),
+        a.rewards.clone(),
+        &ExecuteMsg::Rewards(DistributeRewardsMsg { callback: None }.into()),
+        &coins(1_000, "TOKEN"),
+    )
+    .unwrap();
+
+    // Check incentive query with limit set
+    let incentives: StdResult<IncentivesResponse> = app.wrap().query_wasm_smart(
+        &a.rewards,
+        &QueryMsg::Incentives {
+            start_after: None,
+            limit: Some(1000),
+        },
+    );
+    assert!(incentives.is_ok());
+    let incentives = incentives.unwrap();
+    assert_eq!(incentives.incentives.len(), 90);
 }

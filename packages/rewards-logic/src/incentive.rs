@@ -97,6 +97,8 @@ impl From<Incentive> for IncentiveResponse {
 
 pub fn load_incentives(storage: &dyn Storage, limit: usize) -> StdResult<Vec<Incentive>> {
     incentives()
+        .idx
+        .last_distributed
         .range(storage, None, None, cosmwasm_std::Order::Ascending)
         .map(|r| r.map(|(_, v)| v))
         .take(limit)

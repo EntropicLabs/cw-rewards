@@ -40,7 +40,7 @@ pub fn stake(
         }
     }
 
-    let event = Event::new(format!("quark/{namespace}/rewards/stake")).add_attributes(vec![
+    let event = Event::new(format!("{namespace}/rewards/stake")).add_attributes(vec![
         ("action", "rewards/stake"),
         ("staker", user.as_str()),
         ("amount", &stake_coin.amount.to_string()),
@@ -80,7 +80,7 @@ pub fn unstake(
         Some(cb) => cb.to_message(user, Empty {}, coins)?,
     };
 
-    let event = Event::new(format!("quark/{namespace}/rewards/unstake")).add_attributes(vec![
+    let event = Event::new(format!("{namespace}/rewards/unstake")).add_attributes(vec![
         ("action", "rewards/unstake"),
         ("staker", user.as_str()),
         ("amount", &msg.amount.to_string()),
@@ -110,7 +110,7 @@ pub fn claim(
         Some(cb) => cb.to_message(user, Empty {}, coins.clone())?,
     };
 
-    let event = Event::new(format!("quark/{namespace}/rewards/claim"))
+    let event = Event::new(format!("{namespace}/rewards/claim"))
         .add_attributes(vec![("action", "rewards/claim"), ("staker", user.as_str())]);
 
     Ok(Response::new().add_message(return_msg).add_event(event))
