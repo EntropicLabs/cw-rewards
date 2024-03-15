@@ -37,6 +37,31 @@ pub fn stake_info(
     Ok(StakeInfoResponse { staker, amount })
 }
 
+pub fn weights(
+    deps: Deps<KujiraQuery>,
+    start_after: Option<Addr>,
+    limit: Option<u32>,
+) -> Result<Vec<StakeInfoResponse>, ContractError> {
+    let start_after = start_after.map(|a| a.to_string());
+    let weights = STATE_MACHINE
+        .user_weights
+        .range(
+            deps.storage,
+            start_after.as_ref().map(Bound::exclusive),
+            None,
+            Order::Ascending,
+        )
+        .take(limit.unwrap_or(30) as usize)
+        .map(|r| {
+            r.map(|(k, v)| StakeInfoResponse {
+                staker: Addr::unchecked(k),
+                amount: v,
+            })
+        })
+        .collect::<StdResult<Vec<_>>>()?;
+    Ok(weights)
+}
+
 pub fn incentives(
     deps: Deps<KujiraQuery>,
     start_after: Option<Uint128>,

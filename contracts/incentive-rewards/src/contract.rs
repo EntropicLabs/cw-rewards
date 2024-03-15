@@ -115,6 +115,9 @@ pub fn query(deps: Deps<KujiraQuery>, env: Env, msg: QueryMsg) -> Result<Binary,
             to_json_binary(&query::pending_rewards(deps, env, &config, staker)?)
         }
         QueryMsg::StakeInfo { staker } => to_json_binary(&query::stake_info(deps, staker)?),
+        QueryMsg::Weights { start_after, limit } => {
+            to_json_binary(&query::weights(deps, start_after, limit)?)
+        }
         QueryMsg::Incentives { start_after, limit } => {
             to_json_binary(&query::incentives(deps, start_after, limit)?)
         }
