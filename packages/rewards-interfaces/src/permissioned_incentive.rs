@@ -41,6 +41,11 @@ pub enum QueryMsg {
     PendingRewards { staker: Addr },
     #[returns(crate::StakeInfoResponse)]
     StakeInfo { staker: Addr },
+    #[returns(Vec<crate::StakeInfoResponse>)]
+    Weights {
+        start_after: Option<Addr>,
+        limit: Option<u32>,
+    },
     #[returns(IncentivesResponse)]
     Incentives {
         start_after: Option<Uint128>,
