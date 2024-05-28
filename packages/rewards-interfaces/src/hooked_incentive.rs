@@ -1,6 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
-use kujira::bow::staking::IncentivesResponse;
+use kujira::{bow::staking::IncentivesResponse, Denom, Schedule};
 use serde::{Deserialize, Serialize};
 
 pub use crate::simple::{MigrateMsg, WhitelistedRewards};
@@ -22,6 +22,10 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     UpdateConfig(ConfigUpdate),
     MemberChangedHook(cw4::MemberChangedHookMsg),
+    AddIncentive {
+        denom: Denom,
+        schedule: Schedule,
+    },
     /// Rewards interfaces
     #[serde(untagged)]
     Rewards(crate::RewardsMsg),

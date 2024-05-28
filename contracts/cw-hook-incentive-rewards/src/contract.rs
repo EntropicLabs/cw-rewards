@@ -3,16 +3,20 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     ensure_eq, to_json_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, StdResult,
-    Uint128,
+    Timestamp, Uint128,
 };
 use cw2::set_contract_version;
 use cw4::MemberDiff;
+use cw_utils::NativeBalance;
 use kujira::{KujiraMsg, KujiraQuery};
 use rewards_interfaces::{
     hooked_incentive::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg},
     RewardsMsg,
 };
-use rewards_logic::{incentive, RewardsSM};
+use rewards_logic::{
+    incentive::{self, Incentive},
+    RewardsSM,
+};
 
 use crate::{execute, query, Config, ContractError};
 
@@ -67,6 +71,27 @@ pub fn execute(
             Ok(Response::default()
                 .add_event(Event::new("rewards/hooked/update-weights").add_attributes(attrs)))
         }
+        ExecuteMsg::AddIncentive { denom, schedule } => {
+            let bal = NativeBalance(info.funds);
+            let bal = (bal - config.incentive_fee)
+                .map_err(|_| ContractError::InvalidIncentive {})?
+                .0;
+            if bal.len() != 1
+                || bal[0].amount < config.incentive_min
+                || bal[0].denom != denom.as_ref()
+            {
+                return Err(ContractError::InvalidIncentive {});
+            }
+            let mut incentive =
+                Incentive::new(deps.storage, denom, schedule, &Timestamp::from_nanos(0))?;
+            if let Some(coin) = incentive.distribute(&env.block.time) {
+                STATE_MACHINE.distribute_rewards(deps.storage, &vec![coin])?;
+            }
+            incentive.save(deps.storage)?;
+
+            Ok(Response::default())
+        }
+
         ExecuteMsg::Rewards(msg) => {
             if !STATE_MACHINE
                 .total_staked
