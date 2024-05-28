@@ -536,6 +536,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-hook-incentive-rewards"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw4",
+ "kujira",
+ "kujira-rs-testing",
+ "rewards-interfaces",
+ "rewards-logic",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-hook-rewards"
 version = "1.0.0"
 dependencies = [
