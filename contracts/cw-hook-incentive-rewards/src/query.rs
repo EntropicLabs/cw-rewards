@@ -1,17 +1,29 @@
-use cosmwasm_std::{Addr, Deps, Order, StdResult, Uint128};
+use cosmwasm_std::{Addr, Deps, Env, Order, StdResult, Uint128};
 use cw_storage_plus::Bound;
+use cw_utils::NativeBalance;
 use kujira::{bow::staking::IncentivesResponse, KujiraQuery};
 use rewards_interfaces::{PendingRewardsResponse, StakeInfoResponse};
 use rewards_logic::incentive;
 
-use crate::{contract::STATE_MACHINE, ContractError};
+use crate::{contract::STATE_MACHINE, Config, ContractError};
 
 pub fn pending_rewards(
     deps: Deps<KujiraQuery>,
+    env: Env,
+    config: &Config,
     staker: Addr,
 ) -> Result<PendingRewardsResponse, ContractError> {
+    let lri = incentive::get_lri(deps.storage, config.incentive_crank_limit, &env.block.time)?;
+    let (_, lri_user) = STATE_MACHINE
+        .calculate_users_rewards(deps.storage, &vec![staker.to_string()], &lri)?
+        .pop()
+        .unwrap();
     let accrued = STATE_MACHINE.get_accrued(deps.storage, &staker.to_string())?;
-    Ok(PendingRewardsResponse { rewards: accrued })
+    let mut accrued = NativeBalance(accrued) + NativeBalance(lri_user);
+    accrued.normalize();
+    Ok(PendingRewardsResponse {
+        rewards: accrued.into_vec(),
+    })
 }
 
 pub fn stake_info(
