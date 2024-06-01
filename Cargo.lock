@@ -1809,6 +1809,7 @@ dependencies = [
  "cosmwasm-std",
  "kujira",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -1821,7 +1822,6 @@ dependencies = [
  "cw-utils",
  "kujira",
  "rewards-interfaces",
- "thiserror",
 ]
 
 [[package]]
