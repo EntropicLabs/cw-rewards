@@ -1,6 +1,6 @@
 use cosmwasm_std::{ConversionOverflowError, OverflowError, StdError};
 use cw_utils::PaymentError;
-use rewards_logic::RewardsError;
+use rewards_interfaces::RewardsError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
