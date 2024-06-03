@@ -1,6 +1,9 @@
 mod msg;
 pub use msg::*;
 
+mod error;
+pub use error::RewardsError;
+
 pub mod claiming;
 pub mod hooked;
 pub mod hooked_incentive;

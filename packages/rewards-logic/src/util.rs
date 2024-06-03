@@ -10,7 +10,7 @@ pub fn calculate_total_fee(reward: &Uint128, fees: &[(Decimal, Addr)]) -> Uint12
 /// Calculates the fees sent to each address and modifies input in place.
 pub fn calculate_fee_split(
     rewards: &mut Vec<Coin>,
-    fees: &Vec<(Decimal, Addr)>,
+    fees: &[(Decimal, Addr)],
 ) -> Vec<(Addr, Vec<Coin>)> {
     let mut result = Vec::with_capacity(fees.len());
     fees.iter().for_each(|(_, addr)| {
@@ -39,7 +39,7 @@ pub fn calculate_fee_split(
 /// Splits the entire input amount among the recipients according to their relative weights.
 pub fn calculate_fee_distribution(
     rewards: Vec<Coin>,
-    fees: &Vec<(Decimal, Addr)>,
+    fees: &[(Decimal, Addr)],
 ) -> Vec<(Addr, Vec<Coin>)> {
     let mut result = Vec::with_capacity(fees.len());
     let mut total_weight = Decimal::zero();

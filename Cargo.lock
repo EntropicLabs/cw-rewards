@@ -1863,6 +1863,7 @@ dependencies = [
  "cw4",
  "kujira",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -1875,7 +1876,6 @@ dependencies = [
  "cw-utils",
  "kujira",
  "rewards-interfaces",
- "thiserror",
 ]
 
 [[package]]

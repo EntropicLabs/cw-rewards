@@ -1,9 +1,11 @@
 use cosmwasm_std::{ensure, Addr, BankMsg, Coin, CosmosMsg, Empty, Event, Response, Storage};
 use cw_utils::NativeBalance;
 use kujira::{Denom, KujiraMsg};
-use rewards_interfaces::{ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg};
+use rewards_interfaces::{
+    ClaimRewardsMsg, DistributeRewardsMsg, RewardsError, StakeMsg, UnstakeMsg,
+};
 
-use super::{RewardsError, RewardsSM};
+use super::RewardsSM;
 
 pub fn stake(
     sm: RewardsSM,
