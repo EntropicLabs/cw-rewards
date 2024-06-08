@@ -7,7 +7,7 @@ use kujira::{
     Denom, Schedule,
 };
 
-pub fn incentives<'a>() -> IndexedMap<'a, u128, Incentive, IncentiveIndexes<'a>> {
+pub fn incentives<'a>() -> IndexedMap<u128, Incentive, IncentiveIndexes<'a>> {
     IndexedMap::new(
         "incentives",
         IncentiveIndexes {

@@ -1,6 +1,6 @@
 [package]
 name = "claiming-rewards"
-version = "1.0.0"
+version.workspace = true
 authors = ["Amit Prasad <amit@entropiclabs.io>"]
 edition = "2021"
 
@@ -8,13 +8,12 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 
 [dependencies]
 kujira = { workspace = true }
-cosmwasm-std = { workspace = true }
+cosmwasm-std = { workspace = true, default-features = false }
 cosmwasm-schema = { workspace = true }
 cw-storage-plus = { workspace = true }
 cw-utils = { workspace = true }
@@ -23,9 +22,9 @@ schemars = { workspace = true }
 serde = { workspace = true, default-features = false, features = ["derive"] }
 rewards-logic.workspace = true
 rewards-interfaces.workspace = true
-thiserror = "1"
+thiserror.workspace = true
 
 [dev-dependencies]
-cw-multi-test = { workspace = true }
+cw-multi-test = { workspace = true, default-features = false }
 kujira-rs-testing = { workspace = true }
 permissioned-incentive-rewards = { path = "../permissioned-incentive-rewards" }

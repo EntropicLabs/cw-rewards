@@ -25,10 +25,10 @@ impl RewardInfo {
 }
 
 pub struct RewardsSM<'a> {
-    pub total_staked: Item<'a, Uint128>,
-    pub global_indices: Map<'a, &'a str, Decimal256>,
-    pub user_weights: Map<'a, &'a String, Uint128>,
-    pub user_rewards: Map<'a, (&'a String, &'a str), RewardInfo>,
+    pub total_staked: Item<Uint128>,
+    pub global_indices: Map<&'a str, Decimal256>,
+    pub user_weights: Map<&'a String, Uint128>,
+    pub user_rewards: Map<(&'a String, &'a str), RewardInfo>,
 }
 
 impl<'a> RewardsSM<'a> {

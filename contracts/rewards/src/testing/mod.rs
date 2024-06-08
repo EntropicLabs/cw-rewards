@@ -2,8 +2,9 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage},
-    BankMsg, Coin, CosmosMsg, Decimal, Decimal256, Env, MessageInfo, OwnedDeps, Uint128, Uint256,
+    coins,
+    testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage},
+    BankMsg, CosmosMsg, Decimal, Decimal256, Env, MessageInfo, OwnedDeps, Uint128, Uint256,
 };
 use kujira::{fee_address, KujiraQuery};
 use rewards_interfaces::{simple::*, *};
@@ -30,7 +31,8 @@ pub fn mock_dependencies() -> OwnedDepsType {
 fn setup_contract() -> (OwnedDepsType, Env, MessageInfo) {
     let mut deps = mock_dependencies();
     let env = mock_env();
-    let info = mock_info("sender", &[Coin::new(100, "tokens")]);
+    let sender = deps.api.addr_make("sender");
+    let info = message_info(&sender, &coins(100, "tokens"));
 
     let instantiate_msg = InstantiateMsg {
         owner: info.sender.clone(),
@@ -158,7 +160,7 @@ fn test_stake_zero() {
         callback: None,
     };
 
-    let info_zero = mock_info("sender", &[]);
+    let info_zero = message_info(&deps.api.addr_make("sender"), &[]);
     let res = stake(deps.as_mut(), info_zero.clone(), config, stake_msg);
     assert!(res.is_err()); // Expect an error
 
@@ -286,7 +288,8 @@ fn test_multiple_stakes_multiple_users() {
     .unwrap();
 
     // Stake by second user
-    let info2 = mock_info("another_sender", &[Coin::new(200, "tokens")]);
+    let sender2 = deps.api.addr_make("another_sender");
+    let info2 = message_info(&sender2, &coins(200, "tokens"));
     stake(deps.as_mut(), info2.clone(), config, stake_msg).unwrap();
 
     let total_staked = STATE_MACHINE.total_staked.load(&deps.storage).unwrap();
@@ -347,7 +350,7 @@ fn test_distribute_no_rewards() {
     stake(deps.as_mut(), info, config.clone(), stake_msg).unwrap();
 
     let distribute_msg = DistributeRewardsMsg { callback: None };
-    let info_zero = mock_info("sender", &[]);
+    let info_zero = message_info(&deps.api.addr_make("sender"), &[]);
     let res = distribute(deps.as_mut(), info_zero, config, distribute_msg);
     assert!(res.is_err()); // Expect an error
 }
@@ -455,14 +458,14 @@ fn test_fees() {
         res.messages[0].msg,
         CosmosMsg::Bank(BankMsg::Send {
             to_address: fee_address().to_string(),
-            amount: vec![Coin::new(10, "tokens")]
+            amount: coins(10, "tokens")
         })
     );
     assert_eq!(
         res.messages[1].msg,
         CosmosMsg::Bank(BankMsg::Send {
             to_address: fee_address().to_string(),
-            amount: vec![Coin::new(10, "tokens")]
+            amount: coins(10, "tokens")
         })
     );
 }
