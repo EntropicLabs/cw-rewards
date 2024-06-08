@@ -15,7 +15,7 @@ incremental = false
 overflow-checks = true
 
 [workspace.dependencies]
-kujira = "1.1"
+kujira = { git = "https://github.com/Team-Kujira/kujira-rs" }
 kujira-rs-testing = { git = "https://github.com/Team-Kujira/kujira-rs" }
 cosmwasm-std = { version = "2.0", default-features = false }
 cosmwasm-storage = "2.0"
