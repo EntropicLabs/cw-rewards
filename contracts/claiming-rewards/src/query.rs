@@ -1,12 +1,12 @@
 use cosmwasm_std::{Addr, Deps, Env};
 use cw_utils::NativeBalance;
-use kujira::KujiraQuery;
+
 use rewards_interfaces::{PendingRewardsResponse, StakeInfoResponse};
 
 use crate::{contract::STATE_MACHINE, Config, ContractError};
 
 pub fn pending_rewards(
-    deps: Deps<KujiraQuery>,
+    deps: Deps,
     env: Env,
     config: &Config,
     staker: Addr,
@@ -33,10 +33,7 @@ pub fn pending_rewards(
     })
 }
 
-pub fn stake_info(
-    deps: Deps<KujiraQuery>,
-    staker: Addr,
-) -> Result<StakeInfoResponse, ContractError> {
+pub fn stake_info(deps: Deps, staker: Addr) -> Result<StakeInfoResponse, ContractError> {
     let amount = STATE_MACHINE
         .user_weights
         .may_load(deps.storage, &staker.to_string())?

@@ -4,8 +4,8 @@ mod multi;
 use cosmwasm_std::{coin, coins, Decimal, StdResult, Uint128};
 use cw_multi_test::Executor;
 use kujira::fee_address;
-use kujira_rs_testing::mock::CustomApp;
 use rewards_interfaces::{claiming::*, *};
+use rewards_tests::CustomApp;
 
 use crate::testing::multi::{add_default_incentive, setup_env};
 

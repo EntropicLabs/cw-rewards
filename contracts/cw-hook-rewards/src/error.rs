@@ -34,5 +34,4 @@ pub enum ContractError {
 
     #[error("User weights changed through hooks on this contract")]
     StakeDisabled {},
-
 }

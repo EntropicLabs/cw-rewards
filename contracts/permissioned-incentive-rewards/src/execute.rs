@@ -1,15 +1,15 @@
 use cosmwasm_std::{Coin, DepsMut, MessageInfo, Response};
-use kujira::{Denom, KujiraMsg, KujiraQuery};
+use kujira::Denom;
 use rewards_interfaces::{simple::WhitelistedRewards, ClaimRewardsMsg, DistributeRewardsMsg};
 use rewards_logic::util::{calculate_fee_msgs, calculate_fee_split};
 
 use crate::{contract::STATE_MACHINE, Config, ContractError};
 
 pub fn claim(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     msg: ClaimRewardsMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     rewards_logic::execute::claim(
         STATE_MACHINE,
         deps.storage,
@@ -21,11 +21,11 @@ pub fn claim(
 }
 
 pub fn distribute(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     config: Config,
     msg: DistributeRewardsMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     if info.funds.is_empty() {
         return Err(ContractError::ZeroRewards {});
     }

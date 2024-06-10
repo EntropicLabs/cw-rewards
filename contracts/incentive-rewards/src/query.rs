@@ -1,14 +1,14 @@
 use cosmwasm_std::{Addr, Deps, Env, Order, StdResult, Uint128};
 use cw_storage_plus::Bound;
 use cw_utils::NativeBalance;
-use kujira::{bow::staking::IncentivesResponse, KujiraQuery};
+use kujira::bow::staking::IncentivesResponse;
 use rewards_interfaces::{PendingRewardsResponse, StakeInfoResponse};
 use rewards_logic::incentive;
 
 use crate::{contract::STATE_MACHINE, Config, ContractError};
 
 pub fn pending_rewards(
-    deps: Deps<KujiraQuery>,
+    deps: Deps,
     env: Env,
     config: &Config,
     staker: Addr,
@@ -26,10 +26,7 @@ pub fn pending_rewards(
     })
 }
 
-pub fn stake_info(
-    deps: Deps<KujiraQuery>,
-    staker: Addr,
-) -> Result<StakeInfoResponse, ContractError> {
+pub fn stake_info(deps: Deps, staker: Addr) -> Result<StakeInfoResponse, ContractError> {
     let amount = STATE_MACHINE
         .user_weights
         .may_load(deps.storage, &staker.to_string())?
@@ -38,7 +35,7 @@ pub fn stake_info(
 }
 
 pub fn weights(
-    deps: Deps<KujiraQuery>,
+    deps: Deps,
     start_after: Option<Addr>,
     limit: Option<u32>,
 ) -> Result<Vec<StakeInfoResponse>, ContractError> {
@@ -63,7 +60,7 @@ pub fn weights(
 }
 
 pub fn incentives(
-    deps: Deps<KujiraQuery>,
+    deps: Deps,
     start_after: Option<Uint128>,
     limit: Option<u32>,
 ) -> Result<IncentivesResponse, ContractError> {

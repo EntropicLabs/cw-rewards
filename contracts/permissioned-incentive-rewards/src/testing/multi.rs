@@ -1,10 +1,9 @@
-use cosmwasm_std::{coin, coins, Addr};
+use cosmwasm_std::{coin, coins, Addr, Empty};
 use cw_multi_test::{Contract, ContractWrapper, Executor};
-use kujira::{KujiraMsg, KujiraQuery};
-use kujira_rs_testing::mock::{mock_app, CustomApp};
 use rewards_interfaces::simple::WhitelistedRewards;
+use rewards_tests::{mock_app, CustomApp};
 
-fn contract() -> Box<dyn Contract<KujiraMsg, KujiraQuery>> {
+fn contract() -> Box<dyn Contract<Empty, Empty>> {
     let contract = ContractWrapper::new(
         crate::contract::execute,
         crate::contract::instantiate,

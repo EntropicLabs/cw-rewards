@@ -27,12 +27,6 @@ checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
 
 [[package]]
 name = "base64"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
-
-[[package]]
-name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
@@ -108,10 +102,10 @@ dependencies = [
  "cw-utils",
  "cw2",
  "kujira",
- "kujira-rs-testing",
  "permissioned-incentive-rewards",
  "rewards-interfaces",
  "rewards-logic",
+ "rewards-tests",
  "schemars",
  "serde",
  "thiserror",
@@ -175,7 +169,7 @@ version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ded932165de44cd0717979c34fc3b84d8e8066b8dde4f5bd78f96a643b090f90"
 dependencies = [
- "base64 0.21.7",
+ "base64",
  "bech32 0.9.1",
  "bnum",
  "cosmwasm-crypto",
@@ -247,9 +241,9 @@ dependencies = [
  "cw2",
  "cw4",
  "kujira",
- "kujira-rs-testing",
  "rewards-interfaces",
  "rewards-logic",
+ "rewards-tests",
  "schemars",
  "serde",
  "thiserror",
@@ -267,9 +261,9 @@ dependencies = [
  "cw2",
  "cw4",
  "kujira",
- "kujira-rs-testing",
  "rewards-interfaces",
  "rewards-logic",
+ "rewards-tests",
  "schemars",
  "serde",
  "thiserror",
@@ -278,7 +272,7 @@ dependencies = [
 [[package]]
 name = "cw-multi-test"
 version = "2.0.1"
-source = "git+https://github.com/cosmwasm/cw-multi-test#364fd51fbad7d73752926078beb91242d193e92b"
+source = "git+https://github.com/cosmwasm/cw-multi-test#35f9f0c731041ffc563b0fc1b0a45c7652296465"
 dependencies = [
  "anyhow",
  "bech32 0.11.0",
@@ -286,7 +280,7 @@ dependencies = [
  "cw-storage-plus",
  "cw-utils",
  "derivative",
- "itertools",
+ "itertools 0.13.0",
  "prost",
  "schemars",
  "serde",
@@ -545,9 +539,9 @@ dependencies = [
  "cw-utils",
  "cw2",
  "kujira",
- "kujira-rs-testing",
  "rewards-interfaces",
  "rewards-logic",
+ "rewards-tests",
  "schemars",
  "serde",
  "thiserror",
@@ -558,6 +552,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -584,8 +587,8 @@ dependencies = [
 
 [[package]]
 name = "kujira"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "kujira-bow",
  "kujira-fin",
@@ -597,8 +600,8 @@ dependencies = [
 
 [[package]]
 name = "kujira-bow"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -609,8 +612,8 @@ dependencies = [
 
 [[package]]
 name = "kujira-fin"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -620,8 +623,8 @@ dependencies = [
 
 [[package]]
 name = "kujira-ghost"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -632,8 +635,8 @@ dependencies = [
 
 [[package]]
 name = "kujira-orca"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -641,30 +644,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "kujira-rs-testing"
-version = "1.7.1"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
-dependencies = [
- "anyhow",
- "base64 0.20.0",
- "bech32 0.9.1",
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-storage-plus",
- "cw20",
- "hex",
- "kujira",
- "schemars",
- "serde",
- "serde_json",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "kujira-stable"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -674,8 +656,8 @@ dependencies = [
 
 [[package]]
 name = "kujira-std"
-version = "1.1.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#88f6928e3f1e53b9c3754a0b0ce306bf7c24e943"
+version = "1.2.0"
+source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -716,9 +698,9 @@ dependencies = [
  "cw-utils",
  "cw2",
  "kujira",
- "kujira-rs-testing",
  "rewards-interfaces",
  "rewards-logic",
+ "rewards-tests",
  "schemars",
  "serde",
  "thiserror",
@@ -760,7 +742,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -808,10 +790,19 @@ version = "1.1.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
  "kujira",
  "rewards-interfaces",
+]
+
+[[package]]
+name = "rewards-tests"
+version = "1.1.0"
+dependencies = [
+ "cosmwasm-std",
+ "cw-multi-test",
 ]
 
 [[package]]
@@ -970,7 +961,6 @@ dependencies = [
  "cw-utils",
  "cw2",
  "kujira",
- "kujira-rs-testing",
  "rewards-interfaces",
  "rewards-logic",
  "schemars",

@@ -6,7 +6,7 @@ use cosmwasm_std::{
     StdResult, SubMsg,
 };
 use cw2::set_contract_version;
-use kujira::{KujiraMsg, KujiraQuery};
+
 use rewards_interfaces::{
     claiming::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg},
     ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg,
@@ -24,17 +24,17 @@ pub const STATE_MACHINE: RewardsSM = RewardsSM::new();
 pub struct MigrateMsg {}
 
 #[entry_point]
-pub fn migrate(_deps: DepsMut<KujiraQuery>, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     Ok(Response::default())
 }
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let config = Config::from(msg);
     config.save(deps.storage, deps.api)?;
@@ -46,11 +46,11 @@ pub fn instantiate(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let mut config = Config::load(deps.storage)?;
     match msg {
         ExecuteMsg::Rewards(msg) => {
@@ -97,7 +97,7 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps<KujiraQuery>, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     let config = Config::load(deps.storage)?;
     Ok(match msg {
         QueryMsg::Config {} => to_json_binary(&ConfigResponse::from(config)),

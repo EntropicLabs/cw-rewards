@@ -1,5 +1,4 @@
-use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg, Decimal, Uint128};
-use kujira::KujiraMsg;
+use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Decimal, Uint128};
 
 pub fn calculate_total_fee(reward: &Uint128, fees: &[(Decimal, Addr)]) -> Uint128 {
     fees.iter().fold(Uint128::zero(), |acc, (fee, _)| {
@@ -68,7 +67,7 @@ pub fn calculate_fee_distribution(
     result
 }
 
-pub fn calculate_fee_msgs(fees: Vec<(Addr, Vec<Coin>)>) -> Vec<CosmosMsg<KujiraMsg>> {
+pub fn calculate_fee_msgs<T: CustomMsg>(fees: Vec<(Addr, Vec<Coin>)>) -> Vec<CosmosMsg<T>> {
     let mut msgs = Vec::with_capacity(fees.len());
     for (addr, coins) in fees {
         if !coins.is_empty() {
@@ -83,7 +82,6 @@ pub fn calculate_fee_msgs(fees: Vec<(Addr, Vec<Coin>)>) -> Vec<CosmosMsg<KujiraM
     }
     msgs
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

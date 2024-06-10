@@ -27,4 +27,3 @@ thiserror.workspace = true
 
 [dev-dependencies]
 cw-multi-test = { workspace = true, default-features = false }
-kujira-rs-testing = { workspace = true }

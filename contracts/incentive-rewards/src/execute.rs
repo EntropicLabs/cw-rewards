@@ -1,6 +1,6 @@
 use cosmwasm_std::{ensure, Coin, DepsMut, MessageInfo, Response};
 use cw_utils::one_coin;
-use kujira::{Denom, KujiraMsg, KujiraQuery};
+use kujira::Denom;
 use rewards_interfaces::{
     simple::WhitelistedRewards, ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg,
 };
@@ -9,11 +9,11 @@ use rewards_logic::util::{calculate_fee_msgs, calculate_fee_split};
 use crate::{contract::STATE_MACHINE, Config, ContractError};
 
 pub fn stake(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     config: Config,
     msg: StakeMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let received = one_coin(&info)?;
     ensure!(
         received.denom == config.stake_denom.as_ref(),
@@ -32,11 +32,11 @@ pub fn stake(
 }
 
 pub fn unstake(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     config: Config,
     msg: UnstakeMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     rewards_logic::execute::unstake(
         STATE_MACHINE,
         deps.storage,
@@ -49,10 +49,10 @@ pub fn unstake(
 }
 
 pub fn claim(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     msg: ClaimRewardsMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     rewards_logic::execute::claim(
         STATE_MACHINE,
         deps.storage,
@@ -64,11 +64,11 @@ pub fn claim(
 }
 
 pub fn distribute(
-    deps: DepsMut<KujiraQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     config: Config,
     msg: DistributeRewardsMsg,
-) -> Result<Response<KujiraMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     if info.funds.is_empty() {
         return Err(ContractError::ZeroRewards {});
     }

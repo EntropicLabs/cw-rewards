@@ -1,10 +1,10 @@
-use cosmwasm_std::{coin, coins, Addr};
+use cosmwasm_std::{coin, coins, Addr, Empty};
 use cw_multi_test::{Contract, ContractWrapper, Executor};
-use kujira::{KujiraMsg, KujiraQuery, Schedule};
-use kujira_rs_testing::mock::{mock_app, CustomApp};
+use kujira::Schedule;
 use rewards_interfaces::{claiming::InstantiateMsg, simple::WhitelistedRewards};
+use rewards_tests::{mock_app, CustomApp};
 
-fn contract() -> Box<dyn Contract<KujiraMsg, KujiraQuery>> {
+fn contract() -> Box<dyn Contract<Empty, Empty>> {
     let contract = ContractWrapper::new(
         crate::contract::execute,
         crate::contract::instantiate,
@@ -13,7 +13,7 @@ fn contract() -> Box<dyn Contract<KujiraMsg, KujiraQuery>> {
     Box::new(contract)
 }
 
-fn incentive_rewards() -> Box<dyn Contract<KujiraMsg, KujiraQuery>> {
+fn incentive_rewards() -> Box<dyn Contract<Empty, Empty>> {
     let contract = ContractWrapper::new(
         permissioned_incentive_rewards::contract::execute,
         permissioned_incentive_rewards::contract::instantiate,

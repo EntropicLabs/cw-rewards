@@ -4,9 +4,9 @@ use std::marker::PhantomData;
 use cosmwasm_std::{
     coins,
     testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage},
-    BankMsg, CosmosMsg, Decimal, Decimal256, Env, MessageInfo, OwnedDeps, Uint128, Uint256,
+    BankMsg, CosmosMsg, Decimal, Decimal256, Empty, Env, MessageInfo, OwnedDeps, Uint128, Uint256,
 };
-use kujira::{fee_address, KujiraQuery};
+use kujira::fee_address;
 use rewards_interfaces::{simple::*, *};
 use rewards_logic::state_machine::RewardInfo;
 
@@ -17,7 +17,7 @@ use crate::{
     Config,
 };
 
-type OwnedDepsType = OwnedDeps<MockStorage, MockApi, MockQuerier, KujiraQuery>;
+type OwnedDepsType = OwnedDeps<MockStorage, MockApi, MockQuerier, Empty>;
 
 pub fn mock_dependencies() -> OwnedDepsType {
     OwnedDeps {

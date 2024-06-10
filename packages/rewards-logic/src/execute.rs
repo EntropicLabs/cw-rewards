@@ -1,20 +1,22 @@
-use cosmwasm_std::{ensure, Addr, BankMsg, Coin, CosmosMsg, Empty, Event, Response, Storage};
+use cosmwasm_std::{
+    ensure, Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, Event, Response, Storage,
+};
 use cw_utils::NativeBalance;
-use kujira::{Denom, KujiraMsg};
+use kujira::Denom;
 use rewards_interfaces::{
     ClaimRewardsMsg, DistributeRewardsMsg, RewardsError, StakeMsg, UnstakeMsg,
 };
 
 use super::RewardsSM;
 
-pub fn stake(
+pub fn stake<T: CustomMsg>(
     sm: RewardsSM,
     storage: &mut dyn Storage,
     stake_coin: Coin,
     user: &Addr,
     msg: StakeMsg,
     namespace: &str,
-) -> Result<Response<KujiraMsg>, RewardsError> {
+) -> Result<Response<T>, RewardsError> {
     let coins = sm.increase_weight(
         storage,
         &user.to_string(),
@@ -22,7 +24,7 @@ pub fn stake(
         msg.withdraw_rewards,
     )?;
 
-    let mut msgs: Vec<CosmosMsg<KujiraMsg>> = vec![];
+    let mut msgs: Vec<CosmosMsg<_>> = vec![];
     match (msg.callback, msg.withdraw_rewards && !coins.is_empty()) {
         (None, false) => {}
         (None, true) => {
@@ -53,14 +55,14 @@ pub fn stake(
     Ok(Response::new().add_messages(msgs).add_event(event))
 }
 
-pub fn unstake(
+pub fn unstake<T: CustomMsg>(
     sm: RewardsSM,
     storage: &mut dyn Storage,
     user: &Addr,
     stake_denom: &Denom,
     msg: UnstakeMsg,
     namespace: &str,
-) -> Result<Response<KujiraMsg>, RewardsError> {
+) -> Result<Response<T>, RewardsError> {
     ensure!(!msg.amount.is_zero(), RewardsError::ZeroUnstake {});
 
     let mut coins =
@@ -93,13 +95,13 @@ pub fn unstake(
     Ok(Response::new().add_message(return_msg).add_event(event))
 }
 
-pub fn claim(
+pub fn claim<T: CustomMsg>(
     sm: RewardsSM,
     storage: &mut dyn Storage,
     user: &Addr,
     msg: ClaimRewardsMsg,
     namespace: &str,
-) -> Result<Response<KujiraMsg>, RewardsError> {
+) -> Result<Response<T>, RewardsError> {
     let coins = sm.claim_accrued(storage, &user.to_string())?;
     ensure!(!coins.is_empty(), RewardsError::NoRewardsToClaim {});
 
@@ -118,14 +120,14 @@ pub fn claim(
     Ok(Response::new().add_message(return_msg).add_event(event))
 }
 
-pub fn distribute_rewards(
+pub fn distribute_rewards<T: CustomMsg>(
     sm: RewardsSM,
     storage: &mut dyn Storage,
     sender: Addr,
     rewards: Vec<Coin>,
     msg: DistributeRewardsMsg,
     namespace: &str,
-) -> Result<Response<KujiraMsg>, RewardsError> {
+) -> Result<Response<T>, RewardsError> {
     sm.distribute_rewards(storage, &rewards)?;
 
     let event = Event::new(format!("{namespace}/rewards/distribute")).add_attributes(vec![
