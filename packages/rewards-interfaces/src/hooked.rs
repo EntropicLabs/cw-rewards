@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use serde::{Deserialize, Serialize};
 
 pub use crate::simple::{MigrateMsg, WhitelistedRewards};
@@ -10,6 +10,18 @@ pub struct InstantiateMsg {
     pub hook_src: Addr,
     pub whitelisted_rewards: WhitelistedRewards,
     pub fees: Vec<(Decimal, Addr)>,
+    pub initialize_weights_from: Option<WeightsSource>,
+}
+
+#[cw_serde]
+pub enum WeightsSource {
+    DAODAO { staking: Addr },
+}
+
+#[cw_serde]
+pub enum StakeChangedHookMsg {
+    Stake { addr: Addr, amount: Uint128 },
+    Unstake { addr: Addr, amount: Uint128 },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -17,6 +29,7 @@ pub struct InstantiateMsg {
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub enum ExecuteMsg {
     UpdateConfig(ConfigUpdate),
+    StakeChangeHook(StakeChangedHookMsg),
     MemberChangedHook(cw4::MemberChangedHookMsg),
     /// Rewards interfaces
     #[serde(untagged)]
