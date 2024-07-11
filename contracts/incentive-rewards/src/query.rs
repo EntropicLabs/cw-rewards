@@ -13,17 +13,35 @@ pub fn pending_rewards(
     config: &Config,
     staker: Addr,
 ) -> Result<PendingRewardsResponse, ContractError> {
-    let lri = incentive::get_lri(deps.storage, config.incentive_crank_limit, &env.block.time)?;
-    let (_, lri_user) = STATE_MACHINE
-        .calculate_users_rewards(deps.storage, &vec![staker.to_string()], &lri)?
-        .pop()
-        .unwrap();
-    let accrued = STATE_MACHINE.get_accrued(deps.storage, &staker.to_string())?;
-    let mut accrued = NativeBalance(accrued) + NativeBalance(lri_user);
-    accrued.normalize();
-    Ok(PendingRewardsResponse {
-        rewards: accrued.into_vec(),
-    })
+    let mut accrued = STATE_MACHINE.get_accrued(deps.storage, &staker.to_string())?;
+    if let Some(incentive_cfg) = &config.incentive_module {
+        let lri = incentive::get_lri(deps.storage, incentive_cfg.crank_limit, &env.block.time)?;
+        let (_, lri_user) = STATE_MACHINE
+            .calculate_users_rewards(deps.storage, &vec![staker.to_string()], &lri)?
+            .pop()
+            .unwrap();
+
+        accrued = (NativeBalance(accrued) + NativeBalance(lri_user)).into_vec();
+    }
+    if let Some(underlying_cfg) = &config.underlying_rewards_module {
+        let underlying_rewards: PendingRewardsResponse = deps.querier.query_wasm_smart(
+            &underlying_cfg.underlying_rewards_contract,
+            &rewards_interfaces::incentive::QueryMsg::PendingRewards {
+                staker: env.contract.address,
+            },
+        )?;
+        let (_, pending_user) = STATE_MACHINE
+            .calculate_users_rewards(
+                deps.storage,
+                &vec![staker.to_string()],
+                &underlying_rewards.rewards,
+            )?
+            .pop()
+            .unwrap();
+        accrued = (NativeBalance(accrued) + NativeBalance(pending_user)).into_vec();
+    }
+
+    Ok(PendingRewardsResponse { rewards: accrued })
 }
 
 pub fn stake_info(deps: Deps, staker: Addr) -> Result<StakeInfoResponse, ContractError> {

@@ -102,6 +102,10 @@ impl<'a> RewardsSM<'a> {
         Ok(normalize(accrued))
     }
 
+    pub fn total_staked(&self, storage: &dyn Storage) -> StdResult<Uint128> {
+        Ok(self.total_staked.may_load(storage)?.unwrap_or_default())
+    }
+
     /// Increase the reward weight of the specified user.
     ///
     /// Returns the list of accrued rewards for the user.
@@ -314,6 +318,12 @@ impl<'a> RewardsSM<'a> {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> Default for RewardsSM<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

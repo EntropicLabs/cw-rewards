@@ -1,8 +1,7 @@
 use cosmwasm_std::{
-    ensure, Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, Event, Response, Storage,
+    coin, coins, ensure, Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, Event, Response, Storage,
 };
 use cw_utils::NativeBalance;
-use kujira::Denom;
 use rewards_interfaces::{
     ClaimRewardsMsg, DistributeRewardsMsg, RewardsError, StakeMsg, UnstakeMsg,
 };
@@ -59,29 +58,30 @@ pub fn unstake<T: CustomMsg>(
     sm: RewardsSM,
     storage: &mut dyn Storage,
     user: &Addr,
-    stake_denom: &Denom,
+    stake_denom: &String,
     msg: UnstakeMsg,
     namespace: &str,
 ) -> Result<Response<T>, RewardsError> {
     ensure!(!msg.amount.is_zero(), RewardsError::ZeroUnstake {});
 
-    let mut coins =
+    let mut return_coins =
         sm.decrease_weight(storage, &user.to_string(), msg.amount, msg.withdraw_rewards)?;
 
     // add the stake denom to the coins
     if msg.withdraw_rewards {
-        coins = (NativeBalance(coins) + stake_denom.coin(&msg.amount)).into_vec();
+        return_coins =
+            (NativeBalance(return_coins) + coin(msg.amount.u128(), stake_denom)).into_vec();
     } else {
-        coins = stake_denom.coins(&msg.amount);
+        return_coins = coins(msg.amount.u128(), stake_denom);
     }
 
     let return_msg = match msg.callback {
         None => BankMsg::Send {
             to_address: user.to_string(),
-            amount: coins,
+            amount: return_coins,
         }
         .into(),
-        Some(cb) => cb.to_message(user, Empty {}, coins)?,
+        Some(cb) => cb.to_message(user, Empty {}, return_coins)?,
     };
 
     let event = Event::new(format!("{namespace}/rewards/unstake")).add_attributes(vec![

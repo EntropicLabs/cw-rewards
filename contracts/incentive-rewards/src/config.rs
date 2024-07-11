@@ -1,10 +1,10 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Api, Coin, Decimal, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::Item;
 
-use kujira::Denom;
-use rewards_interfaces::incentive::{
-    ConfigResponse, ConfigUpdate, InstantiateMsg, WhitelistedRewards,
+use rewards_interfaces::{
+    incentive::{ConfigResponse, ConfigUpdate, InstantiateMsg},
+    modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig},
 };
 
 use super::ContractError;
@@ -12,12 +12,10 @@ use super::ContractError;
 #[cw_serde]
 pub struct Config {
     pub owner: Addr,
-    pub stake_denom: Denom,
-    pub whitelisted_rewards: WhitelistedRewards,
-    pub fees: Vec<(Decimal, Addr)>,
-    pub incentive_crank_limit: usize,
-    pub incentive_min: Uint128,
-    pub incentive_fee: Coin,
+    pub staking_module: StakingConfig,
+    pub incentive_module: Option<IncentiveConfig>,
+    pub distribution_module: Option<DistributionConfig>,
+    pub underlying_rewards_module: Option<UnderlyingConfig>,
 }
 
 impl Config {
@@ -40,23 +38,18 @@ impl Config {
         if let Some(owner) = msg.owner {
             self.owner = owner;
         }
-        if let Some(stake_denom) = msg.stake_denom {
-            self.stake_denom = stake_denom;
+
+        if let Some(update) = msg.staking_cfg {
+            self.staking_module = update.update;
         }
-        if let Some(whitelisted_rewards) = msg.whitelisted_rewards {
-            self.whitelisted_rewards = whitelisted_rewards;
+        if let Some(update) = msg.incentive_cfg {
+            self.incentive_module = update.update;
         }
-        if let Some(fees) = msg.fees {
-            self.fees = fees;
+        if let Some(update) = msg.distribution_cfg {
+            self.distribution_module = update.update;
         }
-        if let Some(incentive_crank_limit) = msg.incentive_crank_limit {
-            self.incentive_crank_limit = incentive_crank_limit;
-        }
-        if let Some(incentive_min) = msg.incentive_min {
-            self.incentive_min = incentive_min;
-        }
-        if let Some(incentive_fee) = msg.incentive_fee {
-            self.incentive_fee = incentive_fee;
+        if let Some(update) = msg.underlying_cfg {
+            self.underlying_rewards_module = update.update;
         }
 
         Ok(())
@@ -67,12 +60,10 @@ impl From<InstantiateMsg> for Config {
     fn from(msg: InstantiateMsg) -> Self {
         Self {
             owner: msg.owner,
-            stake_denom: msg.stake_denom,
-            whitelisted_rewards: msg.whitelisted_rewards,
-            fees: msg.fees,
-            incentive_crank_limit: msg.incentive_crank_limit,
-            incentive_min: msg.incentive_min,
-            incentive_fee: msg.incentive_fee,
+            staking_module: msg.staking_module,
+            incentive_module: msg.incentive_module,
+            distribution_module: msg.distribution_module,
+            underlying_rewards_module: msg.underlying_rewards_module,
         }
     }
 }
@@ -81,12 +72,10 @@ impl From<Config> for ConfigResponse {
     fn from(config: Config) -> Self {
         Self {
             owner: config.owner,
-            stake_denom: config.stake_denom,
-            whitelisted_rewards: config.whitelisted_rewards,
-            fees: config.fees,
-            incentive_crank_limit: config.incentive_crank_limit,
-            incentive_min: config.incentive_min,
-            incentive_fee: config.incentive_fee,
+            staking_module: config.staking_module,
+            incentive_module: config.incentive_module,
+            distribution_module: config.distribution_module,
+            underlying_rewards_module: config.underlying_rewards_module,
         }
     }
 }

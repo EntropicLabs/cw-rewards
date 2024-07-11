@@ -1,19 +1,23 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
-use kujira::{bow::staking::IncentivesResponse, Denom, Schedule};
+use cosmwasm_std::{Addr, Uint128};
+use kujira::{bow::staking::IncentivesResponse, Schedule};
 use serde::{Deserialize, Serialize};
 
-pub use crate::simple::{MigrateMsg, WhitelistedRewards};
+use crate::modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig};
+
+#[cw_serde]
+pub enum StakeChangedHookMsg {
+    Stake { addr: Addr, amount: Uint128 },
+    Unstake { addr: Addr, amount: Uint128 },
+}
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: Addr,
-    pub stake_denom: Denom,
-    pub whitelisted_rewards: WhitelistedRewards,
-    pub fees: Vec<(Decimal, Addr)>,
-    pub incentive_crank_limit: usize,
-    pub incentive_min: Uint128,
-    pub incentive_fee: Coin,
+    pub staking_module: StakingConfig,
+    pub incentive_module: Option<IncentiveConfig>,
+    pub distribution_module: Option<DistributionConfig>,
+    pub underlying_rewards_module: Option<UnderlyingConfig>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -21,9 +25,18 @@ pub struct InstantiateMsg {
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub enum ExecuteMsg {
     UpdateConfig(ConfigUpdate),
+    /// Adds an incentive with the specified [`Schedule`]. Only works if incentives modules is enabled.
     AddIncentive {
-        denom: Denom,
+        denom: String,
         schedule: Schedule,
+    },
+    /// Weight change hook from the DAODAO contract
+    StakeChangeHook(StakeChangedHookMsg),
+    /// Weight change hook from the CW4 contract
+    MemberChangedHook(cw4::MemberChangedHookMsg),
+    /// Manual weight change from the owner. Only works if staking module is set to Permissioned
+    AdjustWeights {
+        delta: Vec<(Addr, Uint128)>,
     },
     /// Rewards interfaces
     #[serde(untagged)]
@@ -52,23 +65,24 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
+pub struct ModuleUpdate<T> {
+    pub update: T,
+}
+
+#[cw_serde]
 pub struct ConfigUpdate {
     pub owner: Option<Addr>,
-    pub stake_denom: Option<Denom>,
-    pub whitelisted_rewards: Option<WhitelistedRewards>,
-    pub fees: Option<Vec<(Decimal, Addr)>>,
-    pub incentive_crank_limit: Option<usize>,
-    pub incentive_min: Option<Uint128>,
-    pub incentive_fee: Option<Coin>,
+    pub staking_cfg: Option<ModuleUpdate<StakingConfig>>,
+    pub incentive_cfg: Option<ModuleUpdate<Option<IncentiveConfig>>>,
+    pub distribution_cfg: Option<ModuleUpdate<Option<DistributionConfig>>>,
+    pub underlying_cfg: Option<ModuleUpdate<Option<UnderlyingConfig>>>,
 }
 
 #[cw_serde]
 pub struct ConfigResponse {
     pub owner: Addr,
-    pub stake_denom: Denom,
-    pub whitelisted_rewards: WhitelistedRewards,
-    pub fees: Vec<(Decimal, Addr)>,
-    pub incentive_crank_limit: usize,
-    pub incentive_min: Uint128,
-    pub incentive_fee: Coin,
+    pub staking_module: StakingConfig,
+    pub incentive_module: Option<IncentiveConfig>,
+    pub distribution_module: Option<DistributionConfig>,
+    pub underlying_rewards_module: Option<UnderlyingConfig>,
 }

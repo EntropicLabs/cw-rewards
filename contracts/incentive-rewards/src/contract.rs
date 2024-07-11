@@ -2,14 +2,17 @@ use cosmwasm_schema::cw_serde;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Timestamp,
+    ensure, ensure_eq, to_json_binary, wasm_execute, Binary, Deps, DepsMut, Env, Event,
+    MessageInfo, Response, StdResult, SubMsg, Timestamp,
 };
 use cw2::set_contract_version;
+use cw4::MemberDiff;
 use cw_utils::NativeBalance;
 
 use rewards_interfaces::{
-    incentive::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg},
-    RewardsMsg,
+    incentive::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
+    modules::{StakingConfig, Whitelist},
+    ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg,
 };
 use rewards_logic::{
     incentive::{self, Incentive},
@@ -57,43 +60,149 @@ pub fn execute(
     let mut config = Config::load(deps.storage)?;
     match msg {
         ExecuteMsg::Rewards(msg) => {
-            if !STATE_MACHINE
-                .total_staked
-                .may_load(deps.storage)?
-                .unwrap_or_default()
-                .is_zero()
-            {
+            let zero_staked = STATE_MACHINE.total_staked(deps.storage)?.is_zero();
+            if config.incentive_module.is_some() && !zero_staked {
+                let incentive_cfg = config.incentive_module.as_ref().unwrap();
                 incentive::distribute_lri(
                     deps.storage,
-                    config.incentive_crank_limit,
+                    incentive_cfg.crank_limit,
                     STATE_MACHINE,
                     &env.block.time,
                 )?;
             }
-            match msg {
+
+            let mut claim_underlying_msgs = vec![];
+            if let Some(underlying_rewards) = &config.underlying_rewards_module {
+                let pending: PendingRewardsResponse = deps.querier.query_wasm_smart(
+                    &underlying_rewards.underlying_rewards_contract,
+                    &QueryMsg::PendingRewards {
+                        staker: env.contract.address.clone(),
+                    },
+                )?;
+                if !pending.rewards.is_empty() && !zero_staked {
+                    STATE_MACHINE.distribute_rewards(deps.storage, &pending.rewards)?;
+                    claim_underlying_msgs.push(wasm_execute(
+                        &underlying_rewards.underlying_rewards_contract,
+                        &ExecuteMsg::Rewards(ClaimRewardsMsg { callback: None }.into()),
+                        vec![],
+                    )?);
+                }
+            }
+
+            let res = match msg {
                 RewardsMsg::Stake(msg) => execute::stake(deps, info, config, msg),
                 RewardsMsg::Unstake(msg) => execute::unstake(deps, info, config, msg),
                 RewardsMsg::ClaimRewards(msg) => execute::claim(deps, info, msg),
                 RewardsMsg::DistributeRewards(msg) => execute::distribute(deps, info, config, msg),
+            };
+
+            res.map(|mut res| {
+                res.messages = [
+                    claim_underlying_msgs.into_iter().map(SubMsg::new).collect(),
+                    res.messages,
+                ]
+                .concat();
+                res
+            })
+        }
+
+        // Weight change hook from DAODAO
+        ExecuteMsg::StakeChangeHook(msg) => {
+            let src_addr = match config.staking_module {
+                StakingConfig::DaoDaoHook { daodao_addr } => daodao_addr,
+                _ => {
+                    return Err(ContractError::InvalidStakingConfig(
+                        "DAODAO hook",
+                        config.staking_module,
+                    ))
+                }
+            };
+            ensure_eq!(info.sender, src_addr, ContractError::Unauthorized {});
+            match msg {
+                StakeChangedHookMsg::Stake { addr, amount } => {
+                    STATE_MACHINE.increase_weight(
+                        deps.storage,
+                        &addr.to_string(),
+                        amount,
+                        false,
+                    )?;
+                }
+                StakeChangedHookMsg::Unstake { addr, amount } => {
+                    STATE_MACHINE.decrease_weight(
+                        deps.storage,
+                        &addr.to_string(),
+                        amount,
+                        false,
+                    )?;
+                }
+            };
+
+            Ok(Response::default().add_event(Event::new("rewards/update-weight-hook")))
+        }
+        // Weight change hook from CW4
+        ExecuteMsg::MemberChangedHook(msg) => {
+            let src_addr = match config.staking_module {
+                StakingConfig::Cw4Hook { cw4_addr } => cw4_addr,
+                _ => {
+                    return Err(ContractError::InvalidStakingConfig(
+                        "CW4 hook",
+                        config.staking_module,
+                    ))
+                }
+            };
+            ensure_eq!(info.sender, src_addr, ContractError::Unauthorized {});
+            let mut attrs = vec![];
+            for MemberDiff { key, new, .. } in msg.diffs {
+                let weight = new.unwrap_or_default().into();
+                STATE_MACHINE.set_weight(deps.storage, &key, weight, false)?;
+                attrs.push(("staker", key));
+                attrs.push(("weight", weight.to_string()));
             }
+
+            Ok(Response::default()
+                .add_event(Event::new("rewards/update-weights-hook").add_attributes(attrs)))
         }
         ExecuteMsg::AddIncentive { denom, schedule } => {
-            let bal = NativeBalance(info.funds);
-            let bal = (bal - config.incentive_fee)
-                .map_err(|_| ContractError::InvalidIncentive {})?
-                .0;
-            if bal.len() != 1
-                || bal[0].amount < config.incentive_min
-                || bal[0].denom != denom.as_ref()
+            if config.incentive_module.is_none() {
+                return Err(ContractError::IncentivesNotEnabled {});
+            }
+            let incentive_cfg = config.incentive_module.as_ref().unwrap();
+
+            let mut sent = NativeBalance(info.funds);
+            if let Some(fee) = incentive_cfg.fee.clone() {
+                sent = (sent - fee).map_err(|_| ContractError::InvalidIncentive {})?;
+            }
+            let sent = sent.into_vec();
+
+            if sent.len() != 1
+                || sent[0].amount < incentive_cfg.min_size
+                || sent[0].denom != denom.as_ref()
             {
                 return Err(ContractError::InvalidIncentive {});
             }
+
+            if let Whitelist::Some(denoms) = &incentive_cfg.whitelisted_denoms {
+                ensure!(denoms.contains(&denom), ContractError::InvalidIncentive {});
+            }
+
             let mut incentive =
                 Incentive::new(deps.storage, denom, schedule, &Timestamp::from_nanos(0))?;
             if let Some(coin) = incentive.distribute(&env.block.time) {
                 STATE_MACHINE.distribute_rewards(deps.storage, &vec![coin])?;
             }
             incentive.save(deps.storage)?;
+
+            Ok(Response::default())
+        }
+        ExecuteMsg::AdjustWeights { delta } => {
+            ensure!(
+                matches!(config.staking_module, StakingConfig::Permissioned {}),
+                ContractError::InvalidStakingConfig("AdjustWeights", config.staking_module)
+            );
+            ensure!(info.sender == config.owner, ContractError::Unauthorized {});
+            for (addr, weight) in delta {
+                STATE_MACHINE.set_weight(deps.storage, &addr.to_string(), weight, false)?;
+            }
 
             Ok(Response::default())
         }
