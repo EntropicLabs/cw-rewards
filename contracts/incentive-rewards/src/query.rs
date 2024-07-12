@@ -26,7 +26,7 @@ pub fn pending_rewards(
     if let Some(underlying_cfg) = &config.underlying_rewards_module {
         let underlying_rewards: PendingRewardsResponse = deps.querier.query_wasm_smart(
             &underlying_cfg.underlying_rewards_contract,
-            &rewards_interfaces::incentive::QueryMsg::PendingRewards {
+            &rewards_interfaces::msg::QueryMsg::PendingRewards {
                 staker: env.contract.address,
             },
         )?;

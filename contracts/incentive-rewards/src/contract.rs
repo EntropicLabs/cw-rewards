@@ -10,7 +10,7 @@ use cw4::MemberDiff;
 use cw_utils::NativeBalance;
 
 use rewards_interfaces::{
-    incentive::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
+    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
     modules::{StakingConfig, Whitelist},
     ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg,
 };

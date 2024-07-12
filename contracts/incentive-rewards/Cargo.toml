@@ -1,5 +1,5 @@
 [package]
-name = "incentive-rewards"
+name = "rewards-contract"
 version.workspace = true
 authors = ["Amit Prasad <amit@entropiclabs.io>"]
 edition = "2021"

@@ -1,8 +1,8 @@
-mod msg;
-pub use msg::*;
+mod rewards_msg;
+pub use rewards_msg::*;
 
 mod error;
 pub use error::RewardsError;
 
-pub mod incentive;
 pub mod modules;
+pub mod msg;

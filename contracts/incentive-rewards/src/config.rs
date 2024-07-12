@@ -3,7 +3,7 @@ use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::Item;
 
 use rewards_interfaces::{
-    incentive::{ConfigResponse, ConfigUpdate, InstantiateMsg},
+    msg::{ConfigResponse, ConfigUpdate, InstantiateMsg},
     modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig},
 };
 
