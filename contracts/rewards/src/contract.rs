@@ -3,14 +3,14 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     ensure, ensure_eq, to_json_binary, wasm_execute, Binary, Deps, DepsMut, Env, Event,
-    MessageInfo, Response, StdResult, SubMsg, Timestamp,
+    MessageInfo, Response, StdError, SubMsg, Timestamp,
 };
 use cw2::set_contract_version;
 use cw4::MemberDiff;
 use cw_utils::NativeBalance;
 
 use rewards_interfaces::{
-    modules::{StakingConfig, Whitelist},
+    modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig, Whitelist},
     msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
     ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg,
 };
@@ -30,7 +30,79 @@ pub const STATE_MACHINE: RewardsSM = RewardsSM::new();
 pub struct MigrateMsg {}
 
 #[entry_point]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    mod old {
+        use cosmwasm_schema::cw_serde;
+        use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
+        use cw_storage_plus::Item;
+        use kujira::Denom;
+        use rewards_interfaces::modules::Whitelist;
+
+        #[cw_serde]
+        pub struct OldConfig {
+            pub owner: Addr,
+            pub whitelisted_rewards: Whitelist,
+            pub fees: Vec<(Decimal, Addr)>,
+            pub stake_denom: Option<Denom>,
+            #[serde(flatten)]
+            pub incentive: Option<OldIncentiveConfig>,
+            pub hook_src: Option<Addr>,
+            pub underlying_rewards: Option<Addr>,
+        }
+
+        #[cw_serde]
+        pub struct OldIncentiveConfig {
+            pub incentive_crank_limit: usize,
+            pub incentive_min: Uint128,
+            pub incentive_fee: Coin,
+        }
+
+        pub const CONFIG: Item<OldConfig> = Item::new("config");
+    }
+    let old_cfg = old::CONFIG.load(deps.storage)?;
+    let staking_cfg = match (old_cfg.hook_src, old_cfg.stake_denom) {
+        (None, Some(stake_denom)) => StakingConfig::NativeToken {
+            denom: stake_denom.to_string(),
+        },
+        (Some(hook_src), None) => {
+            let cw2_info = cw2::query_contract_info(&deps.querier, &hook_src)?;
+            if cw2_info.contract == "crates.io:cw4-stake" {
+                StakingConfig::Cw4Hook { cw4_addr: hook_src }
+            } else if cw2_info.contract == "crates.io:dao-voting-token-staked" {
+                StakingConfig::DaoDaoHook {
+                    daodao_addr: hook_src,
+                }
+            } else {
+                return Err(StdError::generic_err("Invalid old staking config").into());
+            }
+        }
+        (None, None) => StakingConfig::Permissioned {},
+        _ => return Err(StdError::generic_err("Invalid old staking config").into()),
+    };
+    let incentive_cfg = old_cfg.incentive.map(|o| IncentiveConfig {
+        crank_limit: o.incentive_crank_limit,
+        min_size: o.incentive_min,
+        fee: Some(o.incentive_fee),
+        whitelisted_denoms: Whitelist::All,
+    });
+    let distribution_cfg = DistributionConfig {
+        whitelisted_denoms: old_cfg.whitelisted_rewards,
+        fees: old_cfg.fees,
+    };
+    let underlying_cfg = old_cfg
+        .underlying_rewards
+        .map(|underlying| UnderlyingConfig {
+            underlying_rewards_contract: underlying,
+        });
+
+    let new_cfg = Config {
+        owner: old_cfg.owner,
+        staking_module: staking_cfg,
+        incentive_module: incentive_cfg,
+        distribution_module: Some(distribution_cfg),
+        underlying_rewards_module: underlying_cfg,
+    };
+    new_cfg.save(deps.storage, deps.api)?;
     Ok(Response::default())
 }
 
