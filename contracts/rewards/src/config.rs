@@ -3,8 +3,8 @@ use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::Item;
 
 use rewards_interfaces::{
-    msg::{ConfigResponse, ConfigUpdate, InstantiateMsg},
     modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig},
+    msg::{ConfigResponse, ConfigUpdate, InstantiateMsg},
 };
 
 use super::ContractError;

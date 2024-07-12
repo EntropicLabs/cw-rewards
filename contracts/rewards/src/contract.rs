@@ -19,7 +19,7 @@ use rewards_logic::{
     RewardsSM,
 };
 
-use crate::{config, execute, query, Config, ContractError};
+use crate::{execute, query, Config, ContractError};
 
 const CONTRACT_NAME: &str = "entropic/incentivized-rewards";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
