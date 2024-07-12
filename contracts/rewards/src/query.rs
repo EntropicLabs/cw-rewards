@@ -2,8 +2,7 @@ use cosmwasm_std::{Addr, Deps, Env, Order, StdResult, Uint128};
 use cw_storage_plus::Bound;
 use cw_utils::NativeBalance;
 use kujira::bow::staking::IncentivesResponse;
-use rewards_interfaces::{PendingRewardsResponse, StakeInfoResponse};
-use rewards_logic::incentive;
+use cw_rewards_logic::{incentive, PendingRewardsResponse, StakeInfoResponse};
 
 use crate::{contract::STATE_MACHINE, Config, ContractError};
 
@@ -26,7 +25,7 @@ pub fn pending_rewards(
     if let Some(underlying_cfg) = &config.underlying_rewards_module {
         let underlying_rewards: PendingRewardsResponse = deps.querier.query_wasm_smart(
             &underlying_cfg.underlying_rewards_contract,
-            &rewards_interfaces::msg::QueryMsg::PendingRewards {
+            &crate::msg::QueryMsg::PendingRewards {
                 staker: env.contract.address,
             },
         )?;

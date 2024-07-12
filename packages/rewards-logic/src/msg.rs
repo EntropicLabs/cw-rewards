@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Addr, Coin, Uint128};
 use kujira::CallbackData;
 
 #[cw_serde]
@@ -35,6 +35,17 @@ pub struct ClaimRewardsMsg {
 #[cw_serde]
 pub struct DistributeRewardsMsg {
     pub callback: Option<CallbackData>,
+}
+
+#[cw_serde]
+pub struct PendingRewardsResponse {
+    pub rewards: Vec<Coin>,
+}
+
+#[cw_serde]
+pub struct StakeInfoResponse {
+    pub staker: Addr,
+    pub amount: Uint128,
 }
 
 impl From<StakeMsg> for RewardsMsg {

@@ -1,17 +1,11 @@
 use std::fmt::Debug;
 
+use crate::msg::*;
 use cosmwasm_std::{Addr, Coin, Empty, StdResult, Timestamp, Uint128};
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
 use cw_utils::NativeBalance;
 use kujira::Schedule;
-use rewards_interfaces::modules::{
-    DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig,
-};
-use rewards_interfaces::msg::{ConfigUpdate, ExecuteMsg, InstantiateMsg, QueryMsg};
-use rewards_interfaces::{
-    ClaimRewardsMsg, DistributeRewardsMsg, PendingRewardsResponse, RewardsMsg, StakeInfoResponse,
-    StakeMsg, UnstakeMsg,
-};
+use cw_rewards_logic::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

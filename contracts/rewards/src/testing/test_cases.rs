@@ -1,10 +1,8 @@
 use cosmwasm_std::{coin, coins, Decimal, Uint128};
 use kujira::{bow::staking::IncentivesResponse, Denom, Release, Schedule};
-use rewards_interfaces::{
-    modules::{DistributionConfig, StakingConfig, UnderlyingConfig, Whitelist},
-    msg::{ConfigResponse, ConfigUpdate, ExecuteMsg, ModuleUpdate, QueryMsg, StakeChangedHookMsg},
-    DistributeRewardsMsg, PendingRewardsResponse, RewardsMsg, StakeInfoResponse,
-};
+
+use crate::{msg::*, Config};
+use cw_rewards_logic::*;
 
 use super::{
     test_helpers::TestEnv,
@@ -949,7 +947,7 @@ define_test! {
         }, vec![coin(1000, "ureward"), coin(10, "utoken")]).unwrap();
 
         // Test QueryMsg::Config
-        let config: ConfigResponse = env.query(QueryMsg::Config {}).unwrap();
+        let config: Config = env.query(QueryMsg::Config {}).unwrap();
         assert_eq!(config.owner, env.addr("owner"));
         assert_eq!(config.staking_module, StakingConfig::NativeToken{denom: "utoken".to_string()});
         assert!(config.distribution_module.is_some());

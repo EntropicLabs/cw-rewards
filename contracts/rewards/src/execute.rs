@@ -1,11 +1,9 @@
 use cosmwasm_std::{coin, Coin, DepsMut, MessageInfo, Response};
 use cw_utils::must_pay;
-use rewards_interfaces::{
-    modules::{StakingConfig, Whitelist},
-    ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg,
-};
-use rewards_logic::util::{calculate_fee_msgs, calculate_fee_split};
+use cw_rewards_logic::util::{calculate_fee_msgs, calculate_fee_split};
+use cw_rewards_logic::{ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg};
 
+use crate::msg::{StakingConfig, Whitelist};
 use crate::{contract::STATE_MACHINE, Config, ContractError};
 
 pub fn stake(
@@ -25,7 +23,7 @@ pub fn stake(
     };
     let received = must_pay(&info, &stake_denom)?;
 
-    rewards_logic::execute::stake(
+    cw_rewards_logic::execute::stake(
         STATE_MACHINE,
         deps.storage,
         coin(received.u128(), &stake_denom),
@@ -52,7 +50,7 @@ pub fn unstake(
         }
     };
 
-    rewards_logic::execute::unstake(
+    cw_rewards_logic::execute::unstake(
         STATE_MACHINE,
         deps.storage,
         &info.sender,
@@ -68,7 +66,7 @@ pub fn claim(
     info: MessageInfo,
     msg: ClaimRewardsMsg,
 ) -> Result<Response, ContractError> {
-    rewards_logic::execute::claim(
+    cw_rewards_logic::execute::claim(
         STATE_MACHINE,
         deps.storage,
         &info.sender,
@@ -106,7 +104,7 @@ pub fn distribute(
     let fees = calculate_fee_split(&mut rewards, &distribution_cfg.fees);
     let msgs = calculate_fee_msgs(fees);
 
-    rewards_logic::execute::distribute_rewards(
+    cw_rewards_logic::execute::distribute_rewards(
         STATE_MACHINE,
         deps.storage,
         info.sender,

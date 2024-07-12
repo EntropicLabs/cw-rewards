@@ -11,7 +11,7 @@ mod macros {
         ) => {{
             use crate::testing::test_helpers::create_config as create_config_helper;
             #[allow(unused_imports)]
-            use rewards_interfaces::modules::{StakingConfig, IncentiveConfig, DistributionConfig, UnderlyingConfig};
+            use crate::msg::{StakingConfig, IncentiveConfig, DistributionConfig, UnderlyingConfig};
             use cosmwasm_std::Addr;
 
             let staking_module = match stringify!($staking_variant) {

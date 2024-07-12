@@ -1,15 +1,10 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use kujira::{bow::staking::IncentivesResponse, Schedule};
+use cw_rewards_logic::{PendingRewardsResponse, RewardsMsg, StakeInfoResponse};
 use serde::{Deserialize, Serialize};
 
-use crate::modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig};
-
-#[cw_serde]
-pub enum StakeChangedHookMsg {
-    Stake { addr: Addr, amount: Uint128 },
-    Unstake { addr: Addr, amount: Uint128 },
-}
+use crate::Config;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -40,19 +35,19 @@ pub enum ExecuteMsg {
     },
     /// Rewards interfaces
     #[serde(untagged)]
-    Rewards(crate::RewardsMsg),
+    Rewards(RewardsMsg),
 }
 
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(ConfigResponse)]
+    #[returns(Config)]
     Config {},
-    #[returns(crate::PendingRewardsResponse)]
+    #[returns(PendingRewardsResponse)]
     PendingRewards { staker: Addr },
-    #[returns(crate::StakeInfoResponse)]
+    #[returns(StakeInfoResponse)]
     StakeInfo { staker: Addr },
-    #[returns(Vec<crate::StakeInfoResponse>)]
+    #[returns(Vec<StakeInfoResponse>)]
     Weights {
         start_after: Option<Addr>,
         limit: Option<u32>,
@@ -62,6 +57,39 @@ pub enum QueryMsg {
         start_after: Option<Uint128>,
         limit: Option<u32>,
     },
+}
+
+#[cw_serde]
+pub enum Whitelist {
+    All,
+    Some(Vec<String>),
+}
+
+#[cw_serde]
+pub enum StakingConfig {
+    NativeToken { denom: String },
+    Cw4Hook { cw4_addr: Addr },
+    DaoDaoHook { daodao_addr: Addr },
+    Permissioned {},
+}
+
+#[cw_serde]
+pub struct IncentiveConfig {
+    pub crank_limit: usize,
+    pub min_size: Uint128,
+    pub fee: Option<Coin>,
+    pub whitelisted_denoms: Whitelist,
+}
+
+#[cw_serde]
+pub struct DistributionConfig {
+    pub fees: Vec<(Decimal, Addr)>,
+    pub whitelisted_denoms: Whitelist,
+}
+
+#[cw_serde]
+pub struct UnderlyingConfig {
+    pub underlying_rewards_contract: Addr,
 }
 
 #[cw_serde]
@@ -80,10 +108,7 @@ pub struct ConfigUpdate {
 }
 
 #[cw_serde]
-pub struct ConfigResponse {
-    pub owner: Addr,
-    pub staking_module: StakingConfig,
-    pub incentive_module: Option<IncentiveConfig>,
-    pub distribution_module: Option<DistributionConfig>,
-    pub underlying_rewards_module: Option<UnderlyingConfig>,
+pub enum StakeChangedHookMsg {
+    Stake { addr: Addr, amount: Uint128 },
+    Unstake { addr: Addr, amount: Uint128 },
 }

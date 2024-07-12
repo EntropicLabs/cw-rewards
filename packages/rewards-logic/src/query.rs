@@ -1,5 +1,5 @@
+use crate::{PendingRewardsResponse, StakeInfoResponse};
 use cosmwasm_std::{Addr, StdResult, Storage};
-use rewards_interfaces::{PendingRewardsResponse, StakeInfoResponse};
 
 use super::RewardsSM;
 

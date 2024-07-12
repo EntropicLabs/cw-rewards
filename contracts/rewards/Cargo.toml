@@ -1,5 +1,5 @@
 [package]
-name = "rewards-contract"
+name = "cw-rewards"
 version.workspace = true
 authors = ["Amit Prasad <amit@entropiclabs.io>"]
 edition = "2021"
@@ -22,8 +22,7 @@ cw2 = { workspace = true }
 cw4 = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, default-features = false, features = ["derive"] }
-rewards-logic.workspace = true
-rewards-interfaces.workspace = true
+cw-rewards-logic.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

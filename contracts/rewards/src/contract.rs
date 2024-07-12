@@ -9,15 +9,9 @@ use cw2::set_contract_version;
 use cw4::MemberDiff;
 use cw_utils::NativeBalance;
 
-use rewards_interfaces::{
-    modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig, Whitelist},
-    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
-    ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg,
-};
-use rewards_logic::{
-    incentive::{self, Incentive},
-    RewardsSM,
-};
+use crate::msg::*;
+use cw_rewards_logic::{incentive, RewardsSM};
+use cw_rewards_logic::{ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg};
 
 use crate::{execute, query, Config, ContractError};
 
@@ -29,14 +23,14 @@ pub const STATE_MACHINE: RewardsSM = RewardsSM::new();
 #[cw_serde]
 pub struct MigrateMsg {}
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     mod old {
+        use crate::msg::Whitelist;
         use cosmwasm_schema::cw_serde;
         use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
         use cw_storage_plus::Item;
         use kujira::Denom;
-        use rewards_interfaces::modules::Whitelist;
 
         #[cw_serde]
         pub struct OldConfig {
@@ -106,7 +100,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     Ok(Response::default())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -304,8 +298,12 @@ pub fn execute(
                 ensure!(denoms.contains(&denom), ContractError::InvalidIncentive {});
             }
 
-            let mut incentive =
-                Incentive::new(deps.storage, denom, schedule, &Timestamp::from_nanos(0))?;
+            let mut incentive = incentive::Incentive::new(
+                deps.storage,
+                denom,
+                schedule,
+                &Timestamp::from_nanos(0),
+            )?;
             if let Some(coin) = incentive.distribute(&env.block.time) {
                 STATE_MACHINE.distribute_rewards(deps.storage, &vec![coin])?;
             }
@@ -338,7 +336,7 @@ pub fn execute(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     let config = Config::load(deps.storage)?;
     Ok(match msg {
-        QueryMsg::Config {} => to_json_binary(&ConfigResponse::from(config)),
+        QueryMsg::Config {} => to_json_binary(&config),
         QueryMsg::PendingRewards { staker } => {
             to_json_binary(&query::pending_rewards(deps, env, &config, staker)?)
         }

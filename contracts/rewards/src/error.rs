@@ -1,7 +1,9 @@
 use cosmwasm_std::{ConversionOverflowError, OverflowError, StdError};
 use cw_utils::PaymentError;
-use rewards_interfaces::{modules::StakingConfig, RewardsError};
+use cw_rewards_logic::RewardsError;
 use thiserror::Error;
+
+use crate::msg::StakingConfig;
 
 #[derive(Error, Debug)]
 pub enum ContractError {
@@ -25,12 +27,6 @@ pub enum ContractError {
 
     #[error("Reward denom not on whitelist")]
     RewardNotWhitelisted {},
-
-    #[error("Stake denom not on whitelist")]
-    StakeNotWhitelisted {},
-
-    #[error("Requested zero unstake")]
-    ZeroUnstake {},
 
     #[error("Distributed zero rewards")]
     ZeroRewards {},

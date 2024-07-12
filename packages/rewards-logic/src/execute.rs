@@ -2,11 +2,8 @@ use cosmwasm_std::{
     coin, coins, ensure, Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, Event, Response, Storage,
 };
 use cw_utils::NativeBalance;
-use rewards_interfaces::{
-    ClaimRewardsMsg, DistributeRewardsMsg, RewardsError, StakeMsg, UnstakeMsg,
-};
 
-use super::RewardsSM;
+use crate::{ClaimRewardsMsg, DistributeRewardsMsg, RewardsError, RewardsSM, StakeMsg, UnstakeMsg};
 
 pub fn stake<T: CustomMsg>(
     sm: RewardsSM,

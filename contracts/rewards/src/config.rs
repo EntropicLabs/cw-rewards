@@ -2,9 +2,9 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::Item;
 
-use rewards_interfaces::{
-    modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig},
-    msg::{ConfigResponse, ConfigUpdate, InstantiateMsg},
+use crate::msg::{
+    ConfigUpdate, DistributionConfig, IncentiveConfig, InstantiateMsg, StakingConfig,
+    UnderlyingConfig,
 };
 
 use super::ContractError;
@@ -64,18 +64,6 @@ impl From<InstantiateMsg> for Config {
             incentive_module: msg.incentive_module,
             distribution_module: msg.distribution_module,
             underlying_rewards_module: msg.underlying_rewards_module,
-        }
-    }
-}
-
-impl From<Config> for ConfigResponse {
-    fn from(config: Config) -> Self {
-        Self {
-            owner: config.owner,
-            staking_module: config.staking_module,
-            incentive_module: config.incentive_module,
-            distribution_module: config.distribution_module,
-            underlying_rewards_module: config.underlying_rewards_module,
         }
     }
 }
