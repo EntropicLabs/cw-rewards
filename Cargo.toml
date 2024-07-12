@@ -1,6 +1,6 @@
 [workspace]
 members = ["contracts/*", "packages/*"]
-package.version = "1.1.0"
+package.version = "2.0.0"
 resolver = "1"
 
 [profile.release]
@@ -15,7 +15,7 @@ incremental = false
 overflow-checks = true
 
 [workspace.dependencies]
-kujira = { git = "https://github.com/Team-Kujira/kujira-rs" }
+kujira = "1.3.0"
 cosmwasm-std = { version = "2.0", default-features = false }
 cosmwasm-storage = "2.0"
 cw-storage-plus = "2.0"

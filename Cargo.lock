@@ -542,8 +542,9 @@ dependencies = [
 
 [[package]]
 name = "kujira"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59f968a70c33b001ed98a044f65350eae57bcde68fc26d17c4df1cc11f1f777d"
 dependencies = [
  "kujira-bow",
  "kujira-fin",
@@ -555,8 +556,9 @@ dependencies = [
 
 [[package]]
 name = "kujira-bow"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a515da380e571bfe716cff9beb6514ac48923ba4e0ae7713fbe378dd14cf4c57"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -567,8 +569,9 @@ dependencies = [
 
 [[package]]
 name = "kujira-fin"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b7ecc665ea38d7688fcf4fa5e906389eee5cc203144cc0f9aaad4cc4b65f8ab"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -578,8 +581,9 @@ dependencies = [
 
 [[package]]
 name = "kujira-ghost"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d0061d311b69bde5ae6d9827c45fcf33e7dbd2c5b3153ad84aba05312874d7f"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -590,8 +594,9 @@ dependencies = [
 
 [[package]]
 name = "kujira-orca"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b10d4c91bcb0f45d774bf188230af3bb10751ac07b0d34ecd52f0c5fcb7039"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -600,8 +605,9 @@ dependencies = [
 
 [[package]]
 name = "kujira-stable"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f5bd08098c987ccb92042e4bfc17d77050abc89709db6abb2b3d43bb27646bd"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -611,8 +617,9 @@ dependencies = [
 
 [[package]]
 name = "kujira-std"
-version = "1.2.0"
-source = "git+https://github.com/Team-Kujira/kujira-rs#6b49ba1d66c7a50147df129bf9dcf3c3487da105"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36bef84a1bb41ed7704931eaef4499398398c65ec4047a7c1f3f447b5d784cdb"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -710,7 +717,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-contract"
-version = "1.1.0"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "cosmwasm-schema",
@@ -732,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-interfaces"
-version = "1.1.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -744,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-logic"
-version = "1.1.0"
+version = "2.0.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
