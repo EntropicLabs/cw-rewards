@@ -1,10 +1,10 @@
 use crate::RewardsSM;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Coin, StdResult, Storage, Timestamp, Uint128};
+use cosmwasm_std::{coin, Coin, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 use kujira::{
     bow::staking::{IncentiveResponse, ScheduleResponse},
-    Denom, Schedule,
+    Schedule,
 };
 
 pub fn incentives<'a>() -> IndexedMap<u128, Incentive, IncentiveIndexes<'a>> {
@@ -36,7 +36,7 @@ pub const INCENTIVE_ID: Item<Uint128> = Item::new("incentive_id");
 #[cw_serde]
 pub struct Incentive {
     pub id: Uint128,
-    pub denom: Denom,
+    pub denom: String,
     pub schedule: Schedule,
     pub last_distributed: Timestamp,
 }
@@ -44,7 +44,7 @@ pub struct Incentive {
 impl Incentive {
     pub fn new(
         storage: &mut dyn Storage,
-        denom: Denom,
+        denom: String,
         schedule: Schedule,
         now: &Timestamp,
     ) -> StdResult<Self> {
@@ -77,14 +77,14 @@ impl Incentive {
         }
 
         self.last_distributed = *now;
-        Some(self.denom.coin(&incentive_amount))
+        Some(coin(incentive_amount.u128(), &self.denom))
     }
 }
 
 impl From<Incentive> for IncentiveResponse {
     fn from(i: Incentive) -> Self {
         Self {
-            denom: i.denom,
+            denom: i.denom.into(),
             schedule: ScheduleResponse {
                 start: i.schedule.start,
                 end: i.schedule.end,

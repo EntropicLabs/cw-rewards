@@ -1,6 +1,6 @@
 use cosmwasm_std::{ConversionOverflowError, OverflowError, StdError};
 use cw_utils::PaymentError;
-use rewards_interfaces::RewardsError;
+use rewards_interfaces::{modules::StakingConfig, RewardsError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -34,4 +34,16 @@ pub enum ContractError {
 
     #[error("Distributed zero rewards")]
     ZeroRewards {},
+
+    #[error("Invalid incentive")]
+    InvalidIncentive {},
+
+    #[error("Incentives not enabled")]
+    IncentivesNotEnabled {},
+
+    #[error("Received {0}, but StakingConfig is {1:?}")]
+    InvalidStakingConfig(&'static str, StakingConfig),
+
+    #[error("Direct distribution not enabled")]
+    DistributionNotEnabled {},
 }

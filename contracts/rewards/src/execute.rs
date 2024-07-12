@@ -1,8 +1,8 @@
-use cosmwasm_std::{ensure, Coin, DepsMut, MessageInfo, Response};
-use cw_utils::one_coin;
-use kujira::Denom;
+use cosmwasm_std::{coin, Coin, DepsMut, MessageInfo, Response};
+use cw_utils::must_pay;
 use rewards_interfaces::{
-    simple::WhitelistedRewards, ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg,
+    modules::{StakingConfig, Whitelist},
+    ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg,
 };
 use rewards_logic::util::{calculate_fee_msgs, calculate_fee_split};
 
@@ -14,16 +14,21 @@ pub fn stake(
     config: Config,
     msg: StakeMsg,
 ) -> Result<Response, ContractError> {
-    let received = one_coin(&info)?;
-    ensure!(
-        received.denom == config.stake_denom.as_ref(),
-        ContractError::StakeNotWhitelisted {}
-    );
+    let stake_denom = match config.staking_module {
+        StakingConfig::NativeToken { denom } => denom,
+        _ => {
+            return Err(ContractError::InvalidStakingConfig(
+                "NativeToken",
+                config.staking_module,
+            ))
+        }
+    };
+    let received = must_pay(&info, &stake_denom)?;
 
     rewards_logic::execute::stake(
         STATE_MACHINE,
         deps.storage,
-        received,
+        coin(received.u128(), &stake_denom),
         &info.sender,
         msg,
         "rewards/simple",
@@ -37,11 +42,21 @@ pub fn unstake(
     config: Config,
     msg: UnstakeMsg,
 ) -> Result<Response, ContractError> {
+    let stake_denom = match config.staking_module {
+        StakingConfig::NativeToken { denom } => denom,
+        _ => {
+            return Err(ContractError::InvalidStakingConfig(
+                "NativeToken",
+                config.staking_module,
+            ))
+        }
+    };
+
     rewards_logic::execute::unstake(
         STATE_MACHINE,
         deps.storage,
         &info.sender,
-        &config.stake_denom,
+        &stake_denom,
         msg,
         "rewards/simple",
     )
@@ -72,9 +87,15 @@ pub fn distribute(
     if info.funds.is_empty() {
         return Err(ContractError::ZeroRewards {});
     }
-    if let WhitelistedRewards::Some(whitelist) = &config.whitelisted_rewards {
+
+    let distribution_cfg = match config.distribution_module {
+        Some(cfg) => cfg,
+        None => return Err(ContractError::DistributionNotEnabled {}),
+    };
+
+    if let Whitelist::Some(whitelist) = &distribution_cfg.whitelisted_denoms {
         for Coin { denom, .. } in info.funds.iter() {
-            if !whitelist.contains(&Denom::from(denom)) {
+            if !whitelist.contains(denom) {
                 return Err(ContractError::RewardNotWhitelisted {});
             }
         }
@@ -82,7 +103,7 @@ pub fn distribute(
 
     // Fee split
     let mut rewards = info.funds;
-    let fees = calculate_fee_split(&mut rewards, &config.fees);
+    let fees = calculate_fee_split(&mut rewards, &distribution_cfg.fees);
     let msgs = calculate_fee_msgs(fees);
 
     rewards_logic::execute::distribute_rewards(

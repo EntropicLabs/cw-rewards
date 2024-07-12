@@ -92,26 +92,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "claiming-rewards"
-version = "1.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "kujira",
- "permissioned-incentive-rewards",
- "rewards-interfaces",
- "rewards-logic",
- "rewards-tests",
- "schemars",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -230,40 +210,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-hook-incentive-rewards"
-version = "1.1.0"
+name = "cw-controllers"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50c1804013d21060b994dea28a080f9eab78a3bcb6b617f05e7634b0600bf7b1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
- "cw2",
- "cw4",
- "kujira",
- "rewards-interfaces",
- "rewards-logic",
- "rewards-tests",
- "schemars",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "cw-hook-rewards"
-version = "1.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "cw4",
- "kujira",
- "rewards-interfaces",
- "rewards-logic",
- "rewards-tests",
  "schemars",
  "serde",
  "thiserror",
@@ -351,6 +306,25 @@ dependencies = [
  "cw-storage-plus",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "cw4-stake"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca9aa9287e0d5c45caae734b33d54f205588321635a311b50a841374bfb69a7d"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-controllers",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw20",
+ "cw4",
+ "schemars",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -529,25 +503,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "incentive-rewards"
-version = "1.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "kujira",
- "rewards-interfaces",
- "rewards-logic",
- "rewards-tests",
- "schemars",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -688,25 +643,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
-name = "permissioned-incentive-rewards"
-version = "1.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "kujira",
- "rewards-interfaces",
- "rewards-logic",
- "rewards-tests",
- "schemars",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "pkcs8"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -773,6 +709,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "rewards-contract"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw20",
+ "cw4",
+ "cw4-stake",
+ "kujira",
+ "rewards-interfaces",
+ "rewards-logic",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "rewards-interfaces"
 version = "1.1.0"
 dependencies = [
@@ -794,14 +752,6 @@ dependencies = [
  "cw-utils",
  "kujira",
  "rewards-interfaces",
-]
-
-[[package]]
-name = "rewards-tests"
-version = "1.1.0"
-dependencies = [
- "cosmwasm-std",
- "cw-multi-test",
 ]
 
 [[package]]
@@ -947,24 +897,6 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "simple-rewards"
-version = "1.1.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "kujira",
- "rewards-interfaces",
- "rewards-logic",
- "schemars",
- "serde",
- "thiserror",
 ]
 
 [[package]]

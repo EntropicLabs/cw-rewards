@@ -1,10 +1,10 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Api, Decimal, StdResult, Storage};
+use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::Item;
 
-use kujira::Denom;
-use rewards_interfaces::simple::{
-    ConfigResponse, ConfigUpdate, InstantiateMsg, WhitelistedRewards,
+use rewards_interfaces::{
+    modules::{DistributionConfig, IncentiveConfig, StakingConfig, UnderlyingConfig},
+    msg::{ConfigResponse, ConfigUpdate, InstantiateMsg},
 };
 
 use super::ContractError;
@@ -12,9 +12,10 @@ use super::ContractError;
 #[cw_serde]
 pub struct Config {
     pub owner: Addr,
-    pub stake_denom: Denom,
-    pub whitelisted_rewards: WhitelistedRewards,
-    pub fees: Vec<(Decimal, Addr)>,
+    pub staking_module: StakingConfig,
+    pub incentive_module: Option<IncentiveConfig>,
+    pub distribution_module: Option<DistributionConfig>,
+    pub underlying_rewards_module: Option<UnderlyingConfig>,
 }
 
 impl Config {
@@ -37,14 +38,18 @@ impl Config {
         if let Some(owner) = msg.owner {
             self.owner = owner;
         }
-        if let Some(stake_denom) = msg.stake_denom {
-            self.stake_denom = stake_denom;
+
+        if let Some(update) = msg.staking_cfg {
+            self.staking_module = update.update;
         }
-        if let Some(whitelisted_rewards) = msg.whitelisted_rewards {
-            self.whitelisted_rewards = whitelisted_rewards;
+        if let Some(update) = msg.incentive_cfg {
+            self.incentive_module = update.update;
         }
-        if let Some(fees) = msg.fees {
-            self.fees = fees;
+        if let Some(update) = msg.distribution_cfg {
+            self.distribution_module = update.update;
+        }
+        if let Some(update) = msg.underlying_cfg {
+            self.underlying_rewards_module = update.update;
         }
 
         Ok(())
@@ -55,9 +60,10 @@ impl From<InstantiateMsg> for Config {
     fn from(msg: InstantiateMsg) -> Self {
         Self {
             owner: msg.owner,
-            stake_denom: msg.stake_denom,
-            whitelisted_rewards: msg.whitelisted_rewards,
-            fees: msg.fees,
+            staking_module: msg.staking_module,
+            incentive_module: msg.incentive_module,
+            distribution_module: msg.distribution_module,
+            underlying_rewards_module: msg.underlying_rewards_module,
         }
     }
 }
@@ -66,9 +72,10 @@ impl From<Config> for ConfigResponse {
     fn from(config: Config) -> Self {
         Self {
             owner: config.owner,
-            stake_denom: config.stake_denom,
-            whitelisted_rewards: config.whitelisted_rewards,
-            fees: config.fees,
+            staking_module: config.staking_module,
+            incentive_module: config.incentive_module,
+            distribution_module: config.distribution_module,
+            underlying_rewards_module: config.underlying_rewards_module,
         }
     }
 }
