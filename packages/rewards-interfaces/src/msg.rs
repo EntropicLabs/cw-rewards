@@ -70,6 +70,7 @@ pub struct ModuleUpdate<T> {
 }
 
 #[cw_serde]
+#[derive(Default)]
 pub struct ConfigUpdate {
     pub owner: Option<Addr>,
     pub staking_cfg: Option<ModuleUpdate<StakingConfig>>,
