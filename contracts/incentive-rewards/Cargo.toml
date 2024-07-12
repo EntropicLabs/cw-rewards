@@ -28,8 +28,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 cw-multi-test = { workspace = true, default-features = false }
-rewards-tests.workspace = true
 anyhow = { workspace = true }
 cw4-stake = { workspace = true }
 cw20 = { workspace = true }
-dao-voting-token-staked = "2.3.0"

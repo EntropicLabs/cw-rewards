@@ -1,9 +1,9 @@
 use cosmwasm_std::{coin, coins, Decimal, Uint128};
-use kujira::{Release, Schedule};
+use kujira::{bow::staking::IncentivesResponse, Denom, Release, Schedule};
 use rewards_interfaces::{
     modules::{DistributionConfig, StakingConfig, UnderlyingConfig, Whitelist},
-    msg::{ConfigUpdate, ExecuteMsg, ModuleUpdate, StakeChangedHookMsg},
-    DistributeRewardsMsg, RewardsMsg,
+    msg::{ConfigResponse, ConfigUpdate, ExecuteMsg, ModuleUpdate, QueryMsg, StakeChangedHookMsg},
+    DistributeRewardsMsg, PendingRewardsResponse, RewardsMsg, StakeInfoResponse,
 };
 
 use super::{
@@ -910,4 +910,101 @@ fn do_test_daodao_hook(env: &mut TestEnv) {
     env.assert_balance("alice", coin(1500, "ureward"));
     env.assert_balance("bob", coin(1000, "utoken"));
     env.assert_balance("bob", coin(1300, "ureward"));
+}
+
+define_test! {
+    name: test_queries,
+    config: {
+        owner: "owner",
+        staking: NativeToken("utoken"),
+        distribution: {
+            fees: vec![(Decimal::percent(5), multi_app().api().addr_make("fee_collector"))],
+            whitelisted_denoms: Whitelist::All,
+        },
+        incentive: {
+            crank_limit: 10,
+            min_size: Uint128::new(100),
+            fee: Some(coin(10, "utoken")),
+            whitelisted_denoms: Whitelist::All,
+        },
+    },
+    accounts: {
+        alice: coins(1000, "utoken"),
+        bob: coins(1000, "utoken"),
+        carol: vec![coin(2000, "utoken"),coin(2000, "ureward")],
+    },
+    test_fn: |env: &mut TestEnv| {
+        // Set up some initial state
+        env.stake("alice", coin(500, "utoken")).unwrap();
+        env.stake("bob", coin(300, "utoken")).unwrap();
+        env.distribute_rewards("carol", coins(800, "utoken")).unwrap();
+
+        let now = env.block_time();
+        let end = now.plus_seconds(3600);
+        env.add_incentive("carol", "ureward", Schedule {
+            start: now,
+            end,
+            amount: Uint128::new(1000),
+            release: Release::Fixed,
+        }, vec![coin(1000, "ureward"), coin(10, "utoken")]).unwrap();
+
+        // Test QueryMsg::Config
+        let config: ConfigResponse = env.query(QueryMsg::Config {}).unwrap();
+        assert_eq!(config.owner, env.addr("owner"));
+        assert_eq!(config.staking_module, StakingConfig::NativeToken{denom: "utoken".to_string()});
+        assert!(config.distribution_module.is_some());
+        assert!(config.incentive_module.is_some());
+
+        // Test QueryMsg::PendingRewards
+        let pending_rewards: PendingRewardsResponse = env.query(QueryMsg::PendingRewards {
+            staker: env.addr("alice"),
+        }).unwrap();
+        assert_eq!(pending_rewards.rewards, vec![coin(475, "utoken")]);
+
+        // Test QueryMsg::StakeInfo
+        let stake_info: StakeInfoResponse = env.query(QueryMsg::StakeInfo {
+            staker: env.addr("bob"),
+        }).unwrap();
+        assert_eq!(stake_info.staker, env.addr("bob"));
+        assert_eq!(stake_info.amount, Uint128::new(300));
+
+        // Test QueryMsg::Weights
+        let weights: Vec<StakeInfoResponse> = env.query(QueryMsg::Weights {
+            start_after: None,
+            limit: None,
+        }).unwrap();
+        assert_eq!(weights.len(), 2);
+        assert_eq!(weights[0].staker, env.addr("alice"));
+        assert_eq!(weights[0].amount, Uint128::new(500));
+        assert_eq!(weights[1].staker, env.addr("bob"));
+        assert_eq!(weights[1].amount, Uint128::new(300));
+
+        // Test QueryMsg::Weights with pagination
+        let weights: Vec<StakeInfoResponse> = env.query(QueryMsg::Weights {
+            start_after: Some(env.addr("alice")),
+            limit: Some(1),
+        }).unwrap();
+        assert_eq!(weights.len(), 1);
+        assert_eq!(weights[0].staker, env.addr("bob"));
+        assert_eq!(weights[0].amount, Uint128::new(300));
+
+        // Test QueryMsg::Incentives
+        let incentives: IncentivesResponse = env.query(QueryMsg::Incentives {
+            start_after: None,
+            limit: None,
+        }).unwrap();
+        assert_eq!(incentives.incentives.len(), 1);
+        assert_eq!(incentives.incentives[0].denom, Denom::from("ureward"));
+        assert_eq!(incentives.incentives[0].schedule.amount, Uint128::new(1000));
+
+        // Advance time to test incentive distribution
+        env.advance_time(1800);
+
+        // Test QueryMsg::PendingRewards after incentive distribution
+        let pending_rewards: PendingRewardsResponse = env.query(QueryMsg::PendingRewards {
+            staker: env.addr("alice"),
+        }).unwrap();
+
+        assert_eq!(pending_rewards.rewards, vec![coin(312, "ureward"), coin(475, "utoken")]);
+    }
 }

@@ -33,4 +33,3 @@ cw4-stake = "2.0"
 serde_json = "1.0"
 rewards-logic = { path = "packages/rewards-logic" }
 rewards-interfaces = { path = "packages/rewards-interfaces" }
-rewards-tests = { path = "packages/rewards-tests" }

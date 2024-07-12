@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use cosmwasm_std::{Addr, Coin, Empty, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Coin, Empty, StdResult, Timestamp, Uint128};
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
 use cw_utils::NativeBalance;
 use kujira::Schedule;
@@ -12,6 +12,7 @@ use rewards_interfaces::{
     ClaimRewardsMsg, DistributeRewardsMsg, PendingRewardsResponse, RewardsMsg, StakeInfoResponse,
     StakeMsg, UnstakeMsg,
 };
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 pub struct TestEnv {
@@ -289,5 +290,11 @@ impl TestEnv {
             self.app
                 .instantiate_contract(code_id, self.owner.clone(), &msg, &[], label, None)?;
         Ok(rewards_addr)
+    }
+
+    pub fn query<T: DeserializeOwned>(&self, query_msg: QueryMsg) -> StdResult<T> {
+        self.app
+            .wrap()
+            .query_wasm_smart(&self.rewards_addr, &query_msg)
     }
 }
