@@ -10,8 +10,8 @@ use cw4::MemberDiff;
 use cw_utils::NativeBalance;
 
 use rewards_interfaces::{
-    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
     modules::{StakingConfig, Whitelist},
+    msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakeChangedHookMsg},
     ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg,
 };
 use rewards_logic::{
@@ -19,7 +19,7 @@ use rewards_logic::{
     RewardsSM,
 };
 
-use crate::{execute, query, Config, ContractError};
+use crate::{config, execute, query, Config, ContractError};
 
 const CONTRACT_NAME: &str = "entropic/incentivized-rewards";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -41,11 +41,58 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    mod weights {
+        use cosmwasm_schema::cw_serde;
+        use cosmwasm_std::Uint128;
+
+        #[cw_serde]
+        pub enum DaoDaoQueryMsg {
+            ListStakers {
+                start_after: Option<String>,
+                limit: Option<u32>,
+            },
+        }
+
+        #[cw_serde]
+        pub struct ListStakersResponse {
+            pub stakers: Vec<StakerBalanceResponse>,
+        }
+
+        #[cw_serde]
+        pub struct StakerBalanceResponse {
+            pub address: String,
+            pub balance: Uint128,
+        }
+    }
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let config = Config::from(msg);
     config.save(deps.storage, deps.api)?;
 
     STATE_MACHINE.initialize(deps.storage)?;
+
+    if let StakingConfig::DaoDaoHook { daodao_addr } = config.staking_module {
+        let mut weights: Vec<weights::StakerBalanceResponse> = vec![];
+        let mut list_stakers: weights::ListStakersResponse;
+        loop {
+            let start_after = weights.last().map(|w| w.address.clone());
+            list_stakers = deps.querier.query_wasm_smart(
+                &daodao_addr,
+                &weights::DaoDaoQueryMsg::ListStakers {
+                    start_after,
+                    limit: Some(30), // Max is 30
+                },
+            )?;
+            if list_stakers.stakers.is_empty() {
+                break;
+            }
+
+            weights.extend(list_stakers.stakers);
+        }
+
+        for staker in weights {
+            STATE_MACHINE.set_weight(deps.storage, &staker.address, staker.balance, false)?;
+        }
+    }
 
     Ok(Response::default())
 }
