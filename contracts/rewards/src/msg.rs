@@ -1,7 +1,8 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
-use kujira::{bow::staking::IncentivesResponse, Schedule};
 use cw_rewards_logic::{PendingRewardsResponse, RewardsMsg, StakeInfoResponse};
+use kujira::{bow::staking::IncentivesResponse, Schedule};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::Config;
@@ -15,7 +16,7 @@ pub struct InstantiateMsg {
     pub underlying_rewards_module: Option<UnderlyingConfig>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub enum ExecuteMsg {
