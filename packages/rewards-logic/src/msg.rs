@@ -1,4 +1,4 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
 use kujira::CallbackData;
 
@@ -38,11 +38,6 @@ pub struct DistributeRewardsMsg {
 }
 
 #[cw_serde]
-pub struct PendingRewardsResponse {
-    pub rewards: Vec<Coin>,
-}
-
-#[cw_serde]
 pub struct StakeInfoResponse {
     pub staker: Addr,
     pub amount: Uint128,
@@ -70,4 +65,16 @@ impl From<DistributeRewardsMsg> for RewardsMsg {
     fn from(val: DistributeRewardsMsg) -> Self {
         RewardsMsg::DistributeRewards(val)
     }
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum RewardsQueryMsg {
+    #[returns(PendingRewardsResponse)]
+    PendingRewards { staker: Addr },
+}
+
+#[cw_serde]
+pub struct PendingRewardsResponse {
+    pub rewards: Vec<Coin>,
 }
