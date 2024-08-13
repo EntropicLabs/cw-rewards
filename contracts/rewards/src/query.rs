@@ -1,10 +1,10 @@
 use cosmwasm_std::{Addr, Deps, Env, Order, StdResult, Uint128};
+use cw_rewards_logic::{incentive, inflation, PendingRewardsResponse, StakeInfoResponse};
 use cw_storage_plus::Bound;
 use cw_utils::NativeBalance;
 use kujira::bow::staking::IncentivesResponse;
-use cw_rewards_logic::{incentive, PendingRewardsResponse, StakeInfoResponse};
 
-use crate::{contract::STATE_MACHINE, Config, ContractError};
+use crate::{contract::STATE_MACHINE, msg::InflationResponse, Config, ContractError};
 
 pub fn pending_rewards(
     deps: Deps,
@@ -38,6 +38,20 @@ pub fn pending_rewards(
             .pop()
             .unwrap();
         accrued = (NativeBalance(accrued) + NativeBalance(pending_user)).into_vec();
+    }
+    if let Some(inflation_cfg) = &config.inflation_module {
+        if let Some((inflation, _)) = inflation::pending_inflation(
+            deps.storage,
+            &STATE_MACHINE,
+            &inflation_cfg.rate_per_year,
+            &env.block.time,
+        )? {
+            let (_, inflation_user) = STATE_MACHINE
+                .calculate_users_rewards(deps.storage, &vec![staker.to_string()], &vec![inflation])?
+                .pop()
+                .unwrap();
+            accrued = (NativeBalance(accrued) + NativeBalance(inflation_user)).into_vec();
+        }
     }
 
     Ok(PendingRewardsResponse { rewards: accrued })
@@ -92,4 +106,25 @@ pub fn incentives(
         .map(|r| r.map(|(_, v)| v.into()))
         .collect::<StdResult<Vec<_>>>()?;
     Ok(IncentivesResponse { incentives: is })
+}
+
+pub fn inflation(
+    deps: Deps,
+    env: Env,
+    config: &Config,
+) -> Result<InflationResponse, ContractError> {
+    if let Some(inflation_cfg) = &config.inflation_module {
+        let inflation = inflation::pending_inflation(
+            deps.storage,
+            &STATE_MACHINE,
+            &inflation_cfg.rate_per_year,
+            &env.block.time,
+        )?;
+        Ok(InflationResponse {
+            rate_per_year: inflation_cfg.rate_per_year,
+            funds: inflation.map(|(_, remaining)| remaining),
+        })
+    } else {
+        Err(ContractError::InflationNotEnabled {})
+    }
 }

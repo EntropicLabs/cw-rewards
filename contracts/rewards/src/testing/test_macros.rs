@@ -6,7 +6,8 @@ mod macros {
             staking: $staking_variant:ident ( $staking_arg:expr ),
             $( distribution: { $( $distribution_key:ident: $distribution_value:expr ),+ $(,)? }, )?
             $( incentive: { $( $incentive_key:ident: $incentive_value:expr ),+ $(,)? }, )?
-            $( underlying: $underlying:expr )?
+            $( underlying: $underlying:expr, )?
+            $( inflation: { $( $inflation_key:ident: $inflation_value:expr ),+ $(,)? }, )?
             $(,)?
         ) => {{
             use crate::testing::test_helpers::create_config as create_config_helper;
@@ -36,6 +37,12 @@ mod macros {
 
             let underlying_rewards_module = None $( .or(Some(UnderlyingConfig { underlying_rewards_contract: Addr::unchecked($underlying) })) )?;
 
+            let inflation_module = None $(
+                .or(Some(InflationConfig {
+                    $( $inflation_key: $inflation_value, )+
+                }))
+            )?;
+
             create_config_helper(
                 $app,
                 $owner,
@@ -43,6 +50,7 @@ mod macros {
                 incentive_module,
                 distribution_module,
                 underlying_rewards_module,
+                inflation_module,
             )
         }};
     }

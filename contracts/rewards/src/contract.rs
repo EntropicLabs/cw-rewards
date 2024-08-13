@@ -1,109 +1,34 @@
-use cosmwasm_schema::cw_serde;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, ensure_eq, to_json_binary, wasm_execute, Binary, Deps, DepsMut, Env, Event,
-    MessageInfo, Response, StdError, SubMsg, Timestamp,
+    ensure, ensure_eq, to_json_binary, wasm_execute, BankMsg, Binary, Deps, DepsMut, Env, Event,
+    MessageInfo, Response, SubMsg, Timestamp,
 };
 use cw2::set_contract_version;
 use cw4::MemberDiff;
-use cw_utils::NativeBalance;
+use cw_utils::{one_coin, NativeBalance};
 
+use crate::migration::MigrateMsg;
 use crate::msg::*;
-use cw_rewards_logic::{incentive, RewardsSM};
+use cw_rewards_logic::{incentive, inflation, RewardsSM};
 use cw_rewards_logic::{ClaimRewardsMsg, PendingRewardsResponse, RewardsMsg};
 
 use crate::{execute, query, Config, ContractError};
 
-const CONTRACT_NAME: &str = "entropic/incentivized-rewards";
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const CONTRACT_NAME: &str = "entropic/cw-rewards";
+pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const STATE_MACHINE: RewardsSM = RewardsSM::new();
 
-#[cw_serde]
-pub struct MigrateMsg {}
-
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    mod old {
-        use crate::msg::Whitelist;
-        use cosmwasm_schema::cw_serde;
-        use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
-        use cw_storage_plus::Item;
-        use kujira::Denom;
-
-        #[cw_serde]
-        pub struct OldConfig {
-            pub owner: Addr,
-            pub whitelisted_rewards: Whitelist,
-            pub fees: Vec<(Decimal, Addr)>,
-            pub stake_denom: Option<Denom>,
-            #[serde(flatten)]
-            pub incentive: Option<OldIncentiveConfig>,
-            pub hook_src: Option<Addr>,
-            pub underlying_rewards: Option<Addr>,
-        }
-
-        #[cw_serde]
-        pub struct OldIncentiveConfig {
-            pub incentive_crank_limit: usize,
-            pub incentive_min: Uint128,
-            pub incentive_fee: Coin,
-        }
-
-        pub const CONFIG: Item<OldConfig> = Item::new("config");
-    }
-    let old_cfg = old::CONFIG.load(deps.storage)?;
-    let staking_cfg = match (old_cfg.hook_src, old_cfg.stake_denom) {
-        (None, Some(stake_denom)) => StakingConfig::NativeToken {
-            denom: stake_denom.to_string(),
-        },
-        (Some(hook_src), None) => {
-            let cw2_info = cw2::query_contract_info(&deps.querier, &hook_src)?;
-            if cw2_info.contract == "crates.io:cw4-stake" {
-                StakingConfig::Cw4Hook { cw4_addr: hook_src }
-            } else if cw2_info.contract == "crates.io:dao-voting-token-staked" {
-                StakingConfig::DaoDaoHook {
-                    daodao_addr: hook_src,
-                }
-            } else {
-                return Err(StdError::generic_err("Invalid old staking config").into());
-            }
-        }
-        (None, None) => StakingConfig::Permissioned {},
-        _ => return Err(StdError::generic_err("Invalid old staking config").into()),
-    };
-    let incentive_cfg = old_cfg.incentive.map(|o| IncentiveConfig {
-        crank_limit: o.incentive_crank_limit,
-        min_size: o.incentive_min,
-        fee: Some(o.incentive_fee),
-        whitelisted_denoms: Whitelist::All,
-    });
-    let distribution_cfg = DistributionConfig {
-        whitelisted_denoms: old_cfg.whitelisted_rewards,
-        fees: old_cfg.fees,
-    };
-    let underlying_cfg = old_cfg
-        .underlying_rewards
-        .map(|underlying| UnderlyingConfig {
-            underlying_rewards_contract: underlying,
-        });
-
-    let new_cfg = Config {
-        owner: old_cfg.owner,
-        staking_module: staking_cfg,
-        incentive_module: incentive_cfg,
-        distribution_module: Some(distribution_cfg),
-        underlying_rewards_module: underlying_cfg,
-    };
-    new_cfg.save(deps.storage, deps.api)?;
-    Ok(Response::default())
+pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+    crate::migration::do_migrate(deps, env, msg)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
@@ -160,6 +85,10 @@ pub fn instantiate(
         }
     }
 
+    if config.inflation_module.is_some() {
+        inflation::LAST_INFLATION_UPDATE.save(deps.storage, &env.block.time)?;
+    }
+
     Ok(Response::default())
 }
 
@@ -200,6 +129,15 @@ pub fn execute(
                         vec![],
                     )?);
                 }
+            }
+
+            if let Some(inflation) = &config.inflation_module {
+                inflation::crank(
+                    deps.storage,
+                    STATE_MACHINE,
+                    &inflation.rate_per_year,
+                    &env.block.time,
+                )?;
             }
 
             let res = match msg {
@@ -311,6 +249,37 @@ pub fn execute(
 
             Ok(Response::default())
         }
+        ExecuteMsg::FundInflation {} => {
+            ensure!(info.sender == config.owner, ContractError::Unauthorized {});
+            ensure!(
+                config.inflation_module.is_some(),
+                ContractError::InflationNotEnabled {}
+            );
+            let funds = one_coin(&info)?;
+            inflation::fund(deps.storage, funds)?;
+
+            Ok(Response::default())
+        }
+        ExecuteMsg::WithdrawInflation { amount } => {
+            ensure!(info.sender == config.owner, ContractError::Unauthorized {});
+            ensure!(
+                config.inflation_module.is_some(),
+                ContractError::InflationNotEnabled {}
+            );
+            let withdraw_coin = inflation::withdraw(
+                deps.storage,
+                &STATE_MACHINE,
+                &config.inflation_module.unwrap().rate_per_year,
+                &env.block.time,
+                amount,
+            )?;
+            let withdraw_msg = BankMsg::Send {
+                to_address: info.sender.to_string(),
+                amount: vec![withdraw_coin],
+            };
+
+            Ok(Response::default().add_message(withdraw_msg))
+        }
         ExecuteMsg::AdjustWeights { delta } => {
             ensure!(
                 matches!(config.staking_module, StakingConfig::Permissioned {}),
@@ -325,6 +294,13 @@ pub fn execute(
         }
         ExecuteMsg::UpdateConfig(msg) => {
             ensure!(info.sender == config.owner, ContractError::Unauthorized {});
+            // If enabling inflation, set the last update time to now.
+            if let (None, Some(ModuleUpdate { update: Some(_) })) =
+                (&config.inflation_module, &msg.inflation_cfg)
+            {
+                inflation::LAST_INFLATION_UPDATE.save(deps.storage, &env.block.time)?;
+            }
+
             config.apply_update(msg)?;
             config.save(deps.storage, deps.api)?;
             Ok(Response::default())
@@ -347,5 +323,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Incentives { start_after, limit } => {
             to_json_binary(&query::incentives(deps, start_after, limit)?)
         }
+        QueryMsg::Inflation {} => to_json_binary(&query::inflation(deps, env, &config)?),
     }?)
 }

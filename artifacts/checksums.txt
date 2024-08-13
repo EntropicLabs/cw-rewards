@@ -1,1 +1,1 @@
-69ab2b3b26154b898b1aa9ccc0f578cc96de663d1ea6c1cb90a4647ec1cbf3fa  cw_rewards.wasm
+3eb55cbd01591ed7c695775934fb103c157a3815cbd80f9d1c38e63ad6a6b96c  cw_rewards.wasm

@@ -88,6 +88,7 @@ pub fn create_config(
     incentive_module: Option<IncentiveConfig>,
     distribution_module: Option<DistributionConfig>,
     underlying_rewards_module: Option<UnderlyingConfig>,
+    inflation_module: Option<InflationConfig>,
 ) -> InstantiateMsg {
     InstantiateMsg {
         owner: app.api().addr_make(owner),
@@ -95,6 +96,7 @@ pub fn create_config(
         incentive_module,
         distribution_module,
         underlying_rewards_module,
+        inflation_module,
     }
 }
 
@@ -230,6 +232,34 @@ impl TestEnv {
                 schedule,
             },
             &payment,
+        )
+    }
+
+    pub fn fund_inflation(
+        &mut self,
+        account: &str,
+        amount: Coin,
+    ) -> anyhow::Result<AppResponse> {
+        self.app.execute_contract(
+            self.addr(account),
+            self.rewards_addr.clone(),
+            &ExecuteMsg::FundInflation {},
+            &[amount],
+        )
+    }
+
+    pub fn withdraw_inflation(
+        &mut self,
+        account: &str,
+        amount: u128,
+    ) -> anyhow::Result<AppResponse> {
+        self.app.execute_contract(
+            self.addr(account),
+            self.rewards_addr.clone(),
+            &ExecuteMsg::WithdrawInflation {
+                amount: Uint128::new(amount),
+            },
+            &[],
         )
     }
 

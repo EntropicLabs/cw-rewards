@@ -1,5 +1,6 @@
 pub mod execute;
 pub mod incentive;
+pub mod inflation;
 pub mod query;
 pub mod state_machine;
 pub mod util;

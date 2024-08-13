@@ -3,8 +3,8 @@ use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::Item;
 
 use crate::msg::{
-    ConfigUpdate, DistributionConfig, IncentiveConfig, InstantiateMsg, StakingConfig,
-    UnderlyingConfig,
+    ConfigUpdate, DistributionConfig, IncentiveConfig, InflationConfig, InstantiateMsg,
+    StakingConfig, UnderlyingConfig,
 };
 
 use super::ContractError;
@@ -16,6 +16,7 @@ pub struct Config {
     pub incentive_module: Option<IncentiveConfig>,
     pub distribution_module: Option<DistributionConfig>,
     pub underlying_rewards_module: Option<UnderlyingConfig>,
+    pub inflation_module: Option<InflationConfig>,
 }
 
 impl Config {
@@ -51,6 +52,9 @@ impl Config {
         if let Some(update) = msg.underlying_cfg {
             self.underlying_rewards_module = update.update;
         }
+        if let Some(update) = msg.inflation_cfg {
+            self.inflation_module = update.update;
+        }
 
         Ok(())
     }
@@ -64,6 +68,7 @@ impl From<InstantiateMsg> for Config {
             incentive_module: msg.incentive_module,
             distribution_module: msg.distribution_module,
             underlying_rewards_module: msg.underlying_rewards_module,
+            inflation_module: msg.inflation_module,
         }
     }
 }

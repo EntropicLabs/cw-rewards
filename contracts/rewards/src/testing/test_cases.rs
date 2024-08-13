@@ -182,6 +182,7 @@ define_test! {
             incentive_cfg: None,
             staking_cfg: None,
             underlying_cfg: None,
+            inflation_cfg: None,
         }).unwrap();
 
         env.stake("alice", coin(500, "utoken")).unwrap();
@@ -548,7 +549,7 @@ fn do_test_underlying_rewards(env: &mut TestEnv) {
     env.execute(
         "carol",
         &underlying,
-        &ExecuteMsg::Rewards(RewardsMsg::DistributeRewards(DistributeRewardsMsg {
+        ExecuteMsg::Rewards(RewardsMsg::DistributeRewards(DistributeRewardsMsg {
             callback: None,
         })),
         vec![coin(1000, "ureward")],
@@ -577,7 +578,7 @@ fn do_test_underlying_rewards(env: &mut TestEnv) {
     env.execute(
         "carol",
         &underlying,
-        &ExecuteMsg::Rewards(RewardsMsg::DistributeRewards(DistributeRewardsMsg {
+        ExecuteMsg::Rewards(RewardsMsg::DistributeRewards(DistributeRewardsMsg {
             callback: None,
         })),
         vec![coin(1000, "ureward")],
@@ -786,7 +787,7 @@ fn do_test_daodao_hook(env: &mut TestEnv) {
     env.execute(
         "owner",
         &env.rewards_addr.clone(),
-        &ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
+        ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
             addr: env.addr("alice").clone(),
             amount: 500u128.into(),
         }),
@@ -812,7 +813,7 @@ fn do_test_daodao_hook(env: &mut TestEnv) {
     env.execute(
         "owner",
         &env.rewards_addr.clone(),
-        &ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
+        ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
             addr: env.addr("alice"),
             amount: 500u128.into(),
         }),
@@ -838,7 +839,7 @@ fn do_test_daodao_hook(env: &mut TestEnv) {
     env.execute(
         "owner",
         &env.rewards_addr.clone(),
-        &ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
+        ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
             addr: env.addr("alice"),
             amount: 500u128.into(),
         }),
@@ -849,7 +850,7 @@ fn do_test_daodao_hook(env: &mut TestEnv) {
     env.execute(
         "owner",
         &env.rewards_addr.clone(),
-        &ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
+        ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Stake {
             addr: env.addr("bob"),
             amount: 300u128.into(),
         }),
@@ -883,7 +884,7 @@ fn do_test_daodao_hook(env: &mut TestEnv) {
     env.execute(
         "owner",
         &env.rewards_addr.clone(),
-        &ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Unstake {
+        ExecuteMsg::StakeChangeHook(StakeChangedHookMsg::Unstake {
             addr: env.addr("alice"),
             amount: 200u128.into(),
         }),
@@ -1004,5 +1005,324 @@ define_test! {
         }).unwrap();
 
         assert_eq!(pending_rewards.rewards, vec![coin(312, "ureward"), coin(475, "utoken")]);
+    }
+}
+
+define_test! {
+    name: test_inflation_module,
+    config: {
+        owner: "owner",
+        staking: NativeToken("utoken"),
+        distribution: {
+            fees: vec![],
+            whitelisted_denoms: Whitelist::All,
+        },
+        inflation: {
+            rate_per_year: Decimal::percent(10),
+        },
+    },
+    accounts: {
+        owner: coins(10000, "utoken"),
+        alice: coins(1000, "utoken"),
+        bob: coins(1000, "utoken"),
+        carol: coins(2000, "utoken"),
+    },
+    test_fn: |env: &mut TestEnv| {
+        // Initial setup
+        env.stake("alice", coin(500, "utoken")).unwrap();
+        env.stake("bob", coin(300, "utoken")).unwrap();
+
+        // Fund inflation
+        env.fund_inflation("owner", coin(1000, "utoken")).unwrap();
+
+        // Query initial inflation state
+        let initial_inflation: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(initial_inflation.rate_per_year, Decimal::percent(10));
+        assert_eq!(initial_inflation.funds, Some(coin(1000, "utoken")));
+
+        // Advance time by 6 months
+        env.advance_time(15768000); // 6 months in seconds
+
+        // Check pending rewards (should include inflation in query, even without crank)
+        // Inflation should be 800 * 0.10 * (1/2 year) = 40 utoken
+        // Alice gets 5/8 of inflation (25), Bob gets 3/8 of inflation (15)
+        env.assert_pending_rewards("alice", vec![coin(25, "utoken")]);
+        env.assert_pending_rewards("bob", vec![coin(15, "utoken")]);
+
+        // Trigger actual inflation distribution
+        env.stake("carol", coin(2000, "utoken")).unwrap();
+
+        // Check pending rewards after distribution
+        env.assert_pending_rewards("alice", vec![coin(25, "utoken")]);
+        env.assert_pending_rewards("bob", vec![coin(15, "utoken")]);
+
+        // Claim rewards
+        env.claim_rewards("alice").unwrap();
+        env.claim_rewards("bob").unwrap();
+
+        // Check balances after claiming
+        env.assert_balance("alice", coin(525, "utoken"));
+        env.assert_balance("bob", coin(715, "utoken"));
+
+        // Withdraw inflation
+        env.execute("owner", &env.rewards_addr.clone(), ExecuteMsg::WithdrawInflation { amount: Uint128::new(200) }, vec![]).unwrap();
+
+        // Query inflation state after withdrawal
+        let after_withdrawal: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_withdrawal.rate_per_year, Decimal::percent(10));
+        assert_eq!(after_withdrawal.funds, Some(coin(760, "utoken")));  // 1000 initial - 40 inflation - 200 withdrawn
+
+        // Check owner's balance after withdrawal
+        env.assert_balance("owner", coin(9200, "utoken")); // 10000 initial - 1000 inflation + 200 withdrawn
+    }
+}
+
+define_test! {
+    name: test_inflation_funding,
+    config: {
+        owner: "owner",
+        staking: NativeToken("utoken"),
+        distribution: {
+            fees: vec![],
+            whitelisted_denoms: Whitelist::All,
+        },
+        inflation: {
+            rate_per_year: Decimal::percent(100),
+        },
+    },
+    accounts: {
+        owner: vec![coin(10000, "utoken"), coin(10000, "ucoin")],
+        alice: coins(1000, "utoken"),
+    },
+    test_fn: |env: &mut TestEnv| {
+        // Test funding inflation when no funding denom is set
+        env.fund_inflation("owner", coin(1000, "utoken")).unwrap();
+        let after_funding: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_funding.rate_per_year, Decimal::percent(100));
+        assert_eq!(after_funding.funds, Some(coin(1000, "utoken")));
+
+        // Test that non-owner can't fund inflation
+        env.fund_inflation("alice", coin(1000, "utoken")).unwrap_err();
+
+        // Test that funding with wrong denom fails, once funding denom is set, fails.
+        env.fund_inflation("owner", coin(1000, "ucoin")).unwrap_err();
+        // Test that adding more funding with correct denom works
+        env.fund_inflation("owner", coin(1000, "utoken")).unwrap();
+
+        // Test that non-owner can't withdraw inflation
+        env.withdraw_inflation("alice", 200).unwrap_err();
+
+        // Test that owner can withdraw inflation
+        env.withdraw_inflation("owner", 200).unwrap();
+        env.assert_balance("owner", coin(8200, "utoken"));
+
+        // Test that owner can't withdraw more than available
+        env.withdraw_inflation("owner", 2000).unwrap_err();
+
+        // Test that owner can withdraw all available
+        env.withdraw_inflation("owner", 1800).unwrap();
+
+        // Test that owner can't withdraw more than available, when there's pending rewards
+        env.fund_inflation("owner", coin(2000, "utoken")).unwrap();
+        env.stake("alice", coin(1000, "utoken")).unwrap();
+
+        env.advance_time(31536000); // 1 year
+        env.assert_pending_rewards("alice", vec![coin(1000, "utoken")]);
+
+        let after_year: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_year.rate_per_year, Decimal::percent(100));
+        assert_eq!(after_year.funds, Some(coin(1000, "utoken")));
+
+        env.withdraw_inflation("owner", 2000).unwrap_err();
+        env.withdraw_inflation("owner", 1000).unwrap();
+    }
+}
+
+define_test! {
+    name: test_inflation_edgecases,
+    config: {
+        owner: "owner",
+        staking: NativeToken("utoken"),
+        distribution: {
+            fees: vec![],
+            whitelisted_denoms: Whitelist::All,
+        },
+        inflation: {
+            rate_per_year: Decimal::percent(100),
+        },
+    },
+    accounts: {
+        owner: vec![coin(10000, "utoken"), coin(10000, "ucoin")],
+        alice: coins(1001, "utoken"),
+    },
+    test_fn: |env: &mut TestEnv| {
+        env.fund_inflation("owner", coin(1000, "utoken")).unwrap();
+
+        env.advance_time(31536000); // 1 year
+
+        // Now stake tokens, cranking the inflation in the process
+        env.stake("alice", coin(1000, "utoken")).unwrap();
+        env.assert_pending_rewards("alice", vec![]);
+
+        // Query inflation after staking
+        let after_staking: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_staking.rate_per_year, Decimal::percent(100));
+        assert_eq!(after_staking.funds, Some(coin(1000, "utoken")));
+    }
+}
+
+define_test! {
+    name: test_inflation_config_update,
+    config: {
+        owner: "owner",
+        staking: NativeToken("utoken"),
+        distribution: {
+            fees: vec![],
+            whitelisted_denoms: Whitelist::All,
+        },
+        inflation: {
+            rate_per_year: Decimal::percent(10),
+        },
+    },
+    accounts: {
+        owner: coins(10000, "utoken"),
+        alice: coins(1000, "utoken"),
+    },
+    test_fn: |env: &mut TestEnv| {
+        // Initial setup
+        env.stake("alice", coin(500, "utoken")).unwrap();
+        env.fund_inflation("owner", coin(1000, "utoken")).unwrap();
+
+        // Query initial inflation state
+        let initial_inflation: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(initial_inflation.rate_per_year, Decimal::percent(10));
+        assert_eq!(initial_inflation.funds, Some(coin(1000, "utoken")));
+
+        // Advance time by 6 months
+        env.advance_time(15768000);
+
+        // Check pending rewards before update
+        env.assert_pending_rewards("alice", vec![coin(25, "utoken")]); // 500 * 0.10 * 0.5 = 25
+
+        // Update inflation rate, BEFORE cranking
+        env.update_config("owner", ConfigUpdate {
+            inflation_cfg: Some(ModuleUpdate {
+                update: Some(InflationConfig {
+                    rate_per_year: Decimal::percent(20),
+                }),
+            }),
+            ..Default::default()
+        }).unwrap();
+
+        // Query inflation after rate update
+        let after_update: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_update.rate_per_year, Decimal::percent(20));
+        assert_eq!(after_update.funds, Some(coin(950, "utoken"))); // 1000 - 500 * 0.20 * 0.5 = 950
+
+        // Advance time by another 6 months
+        env.advance_time(15768000);
+
+        // Check pending rewards after update
+        env.assert_pending_rewards("alice", vec![coin(100, "utoken")]);
+
+        // Test disabling inflation
+        env.update_config("owner", ConfigUpdate {
+            inflation_cfg: Some(ModuleUpdate {
+                update: None,
+            }),
+            ..Default::default()
+        }).unwrap();
+
+        // Check pending rewards after disabling
+        env.assert_pending_rewards("alice", vec![]); // Removes the unapplied inflation
+
+        // Query inflation after disabling
+        env.query::<InflationResponse>(QueryMsg::Inflation {}).unwrap_err();
+
+        // Advance time
+        env.advance_time(15768000);
+
+        // Check pending rewards after disabling (should remain unchanged)
+        env.assert_pending_rewards("alice", vec![]);
+
+        // Test re-enabling inflation
+        env.update_config("owner", ConfigUpdate {
+            inflation_cfg: Some(ModuleUpdate {
+                update: Some(InflationConfig {
+                    rate_per_year: Decimal::percent(5),
+                }),
+            }),
+            ..Default::default()
+        }).unwrap();
+
+        // Query inflation after re-enabling
+        let after_reenable: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_reenable.rate_per_year, Decimal::percent(5));
+        assert_eq!(after_reenable.funds, Some(coin(1000, "utoken"))); // No change from previous state
+        // Query pending rewards after re-enabling
+        env.assert_pending_rewards("alice", vec![]); // No change from previous state
+    }
+}
+
+define_test! {
+    name: test_inflation_query,
+    config: {
+        owner: "owner",
+        staking: NativeToken("utoken"),
+        distribution: {
+            fees: vec![],
+            whitelisted_denoms: Whitelist::All,
+        },
+        inflation: {
+            rate_per_year: Decimal::percent(10),
+        },
+    },
+    accounts: {
+        owner: coins(10000, "utoken"),
+        alice: coins(1000, "utoken"),
+    },
+    test_fn: |env: &mut TestEnv| {
+        // Initial inflation query
+        let initial_inflation: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(initial_inflation.rate_per_year, Decimal::percent(10));
+        assert_eq!(initial_inflation.funds, None);
+
+        env.fund_inflation("owner", coin(1000, "utoken")).unwrap();
+
+        // Query after funding
+        let after_funding: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_funding.rate_per_year, Decimal::percent(10));
+        assert_eq!(after_funding.funds, Some(coin(1000, "utoken")));
+
+        // Stake and advance time
+        env.stake("alice", coin(500, "utoken")).unwrap();
+        env.advance_time(15768000); // 6 months
+
+        // Query after time advance (before distribution)
+        let after_time: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_time.rate_per_year, Decimal::percent(10));
+        assert_eq!(after_time.funds, Some(coin(975, "utoken")));
+
+        // Check pending rewards
+        env.assert_pending_rewards("alice", vec![coin(25, "utoken")]);
+
+        // Trigger distribution
+        env.stake("owner", coin(100, "utoken")).unwrap();
+
+        // Query after distribution, should be unchanged as we were accounting for the crank before.
+        let after_distribution: InflationResponse = env.query(QueryMsg::Inflation {}).unwrap();
+        assert_eq!(after_distribution.rate_per_year, Decimal::percent(10));
+        assert_eq!(after_distribution.funds, Some(coin(975, "utoken")));
+
+        // Disable inflation
+        env.update_config("owner", ConfigUpdate {
+            inflation_cfg: Some(ModuleUpdate {
+                update: None,
+            }),
+            ..Default::default()
+        }).unwrap();
+
+        // Query after disabling
+        env.query::<InflationResponse>(QueryMsg::Inflation {}).unwrap_err();
     }
 }

@@ -14,6 +14,7 @@ pub struct InstantiateMsg {
     pub incentive_module: Option<IncentiveConfig>,
     pub distribution_module: Option<DistributionConfig>,
     pub underlying_rewards_module: Option<UnderlyingConfig>,
+    pub inflation_module: Option<InflationConfig>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -25,6 +26,13 @@ pub enum ExecuteMsg {
     AddIncentive {
         denom: String,
         schedule: Schedule,
+    },
+    /// Adds the sent funds to the inflation module. Only works if inflation module is enabled, and if the
+    /// sent funds are in the correct denomination, as specified in the inflation module.
+    FundInflation {},
+    /// Withdraw rewards from the inflation module. Only works if inflation module is enabled.
+    WithdrawInflation {
+        amount: Uint128,
     },
     /// Weight change hook from the DAODAO contract
     StakeChangeHook(StakeChangedHookMsg),
@@ -58,6 +66,8 @@ pub enum QueryMsg {
         start_after: Option<Uint128>,
         limit: Option<u32>,
     },
+    #[returns(InflationResponse)]
+    Inflation {},
 }
 
 #[cw_serde]
@@ -94,6 +104,12 @@ pub struct UnderlyingConfig {
 }
 
 #[cw_serde]
+pub struct InflationConfig {
+    /// Where one year is defined as 365 * 24 * 60 * 60 seconds,
+    pub rate_per_year: Decimal,
+}
+
+#[cw_serde]
 pub struct ModuleUpdate<T> {
     pub update: T,
 }
@@ -106,10 +122,17 @@ pub struct ConfigUpdate {
     pub incentive_cfg: Option<ModuleUpdate<Option<IncentiveConfig>>>,
     pub distribution_cfg: Option<ModuleUpdate<Option<DistributionConfig>>>,
     pub underlying_cfg: Option<ModuleUpdate<Option<UnderlyingConfig>>>,
+    pub inflation_cfg: Option<ModuleUpdate<Option<InflationConfig>>>,
 }
 
 #[cw_serde]
 pub enum StakeChangedHookMsg {
     Stake { addr: Addr, amount: Uint128 },
     Unstake { addr: Addr, amount: Uint128 },
+}
+
+#[cw_serde]
+pub struct InflationResponse {
+    pub rate_per_year: Decimal,
+    pub funds: Option<Coin>,
 }

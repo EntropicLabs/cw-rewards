@@ -1,7 +1,7 @@
 use cosmwasm_std::{coin, Coin, DepsMut, MessageInfo, Response};
-use cw_utils::must_pay;
 use cw_rewards_logic::util::{calculate_fee_msgs, calculate_fee_split};
 use cw_rewards_logic::{ClaimRewardsMsg, DistributeRewardsMsg, StakeMsg, UnstakeMsg};
+use cw_utils::must_pay;
 
 use crate::msg::{StakingConfig, Whitelist};
 use crate::{contract::STATE_MACHINE, Config, ContractError};

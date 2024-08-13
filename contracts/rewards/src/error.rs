@@ -42,4 +42,7 @@ pub enum ContractError {
 
     #[error("Direct distribution not enabled")]
     DistributionNotEnabled {},
+
+    #[error("Inflation not enabled")]
+    InflationNotEnabled {},
 }
