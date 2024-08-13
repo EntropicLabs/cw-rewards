@@ -61,7 +61,7 @@ This module allows the contract to interact with an underlying rewards contract,
 
 ### 5. Inflation Module
 
-The inflation module allows for automatic generation and distribution of rewards based on a yearly inflation rate. It includes:
+The inflation module allows for automatic distribution of rewards based on a yearly inflation rate. It includes:
 
 - `rate_per_year`: The annual inflation rate as a decimal (e.g., 0.10 for 10% per year).
 
@@ -93,15 +93,15 @@ If the incentive module is enabled, users can create long-running incentives by 
 
 ### Funding Inflation
 
-The contract owner can fund the inflation module by sending tokens to the contract using the `FundInflation` message.
+The contract owner can fund the inflation module by sending tokens to the contract using the `FundInflation` message. If the inflation module cannot cover the rewards (unfunded inflation pool), the inflation will not be distributed.
 
 ### Withdrawing Inflation
 
-The contract owner can withdraw tokens from the inflation module using the `WithdrawInflation` message.
+The contract owner can withdraw tokens from the inflation module using the `WithdrawInflation` message. Note that any tokens that have already been distributed as inflation rewards cannot be withdrawn.
 
-### Inflation Distribution
+### Inflation and Incentive Distribution
 
-Inflation rewards are automatically calculated and distributed when other contract operations (like staking or distributing rewards) are performed. The inflation rate is applied to the total staked amount, prorated for the time since the last update.
+Inflation and incentive rewards are automatically calculated and distributed when other contract operations (like staking or distributing rewards) are performed. The inflation rate is applied to the total staked amount, prorated for the time since the last update.
 
 ### Querying
 
@@ -112,7 +112,7 @@ The contract provides various query endpoints:
 - `StakeInfo`: Provides stake information for a given staker.
 - `Weights`: Lists all stakers and their weights.
 - `Incentives`: Lists all active incentives.
-- `Inflation`: Returns the current inflation rate and available funds for inflation.
+- `Inflation`: Returns the current inflation rate and available funds in the inflation pool.
 
 ### Admin Functions
 
